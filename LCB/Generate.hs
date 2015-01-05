@@ -1,6 +1,12 @@
 -- | Copyright: (c) 2015, Alexander Vershilov
 --   Author:    Alexander Vershilov <alexander.vershilov@gmail.com>
 --
+-- TODO: 
+--   * Read prefixes
+--   * Add documentation
+--   * Add documentation into output code
+--   * Generate header files
+--   * Support total alphabet
 module LCB.Generate
   ( generate 
   , output
@@ -17,7 +23,6 @@ import qualified Data.Map as Map
 uint8_t :: Doc
 uint8_t = "uint8_t"
 
-
 generate v a r = vcat 
      [ "#include" <+> "<stdint.h>"
      , "#define" <+> "CHUNK_NUM"   <+> int chunksNo
@@ -27,7 +32,7 @@ generate v a r = vcat
      , uint8_t <+> "encode_tbl" <> "[]" <+> "=" <+> 
          encloseSep' lbrace rbrace "," (map int (buildAlphabet a)) <> semi
      , linebreak
-     , "int" <+> "chunks" <> brackets "CHUNK_NUM" <> brackets "ALPHABET+1" <+> "=" <+>
+     , "int" <+> "chunks" <> brackets "CHUNK_NUM" <> brackets "ALPHABET+2" <+> "=" <+>
          enclose lbrace rbrace
 	    (align (fillCat $ (map (mkChunk  alphabetSize) v))) -- TODO: use nest
 	 <> semi
@@ -38,7 +43,11 @@ generate v a r = vcat
      , "int" <+> "function" <> (tupled [ "void"   <+> "*cc"
                                        , "int"    <+> parens ("*" <> "has_more_input") <+> parens ("void *")
 				       , uint8_t  <+> parens ("*" <> "get_input") <+> parens ("void *")
-				       , "int"    <+> parens ("*" <> "consume_result") <+> tupled ["void *", "char *"] -- TODO
+				       , "int"    <+> parens ("*" <> "consume_result")
+				                  <+> tupled [ "void *"
+						             , "char *"
+							     , "int"
+							     , "int"] -- TODO
 				       ]
                                        ) <>
          (nest 4 (lbrace <$> inner) <$> rbrace)
@@ -46,17 +55,19 @@ generate v a r = vcat
      where
        inner = vcat 
 	 [ "int i = 0" <> semi
+	 , "int consumed = 0" <> semi
 	 , nest 4 ("do" <+> lbrace <$> do1) <$> rbrace <+> "while (1)" <> semi
-	 , "if (chunks[i][0]) { return 0; }"
-	 , "consume_result(cc, results[chunks[i][0]]); "
+	 , "if (chunks[i][0]) { return 0; }" <> "// no value is associated with node"
+	 , "consume_result(cc, results[chunks[i][0]], consumed, chunks[i][1])" <> semi
 	 ]
        do1   = vcat
 	 [ nest 4 (text "if (!has_more_input(cc))" </> "break" <> semi)
          , uint8_t <+> "c" <+> "=" <+> "decode(get_input(cc))" <> semi
 	 , nest 4 ("if (c == 0)" </> "break" <> semi)
-	 , "int next = chunks[i][c+1]" <> semi
+	 , "int next = chunks[i][c+2]" <> semi
 	 , "if (next == 0) break" <> semi
 	 , "i = next" <> semi
+	 , "++consumed" <> semi
 	 ]
        chunksNo     = length v
        resultsSize  = length r
@@ -75,18 +86,18 @@ buildAlphabet = go 0 1
 chunkNothing = int 0
 chunkValue   = int 1
 
-mkChunk k (_,(i, m)) = encloseSep' lbrace rbrace "," (int i:map int lst) <$$> ","
+mkChunk k (_,(i, m)) = encloseSep' lbrace rbrace "," (int i:typ:map int lst) <$$> ","
   where
     lst = [fromMaybe 0 (Map.lookup j m) | j <- [1..k]]
+    typ 
+      | Map.null m = chunkValue
+      | otherwise  = chunkNothing
     
 
 output g = Text.putStrLn $ displayT $ renderPretty 0.8 80 g
 
 
-{-
-define :: String -> a -> Doc
-define x _ = "#define" <+> text (map toUpper x)
--}
+-- Utilities
 encloseSep' :: Doc -> Doc -> Doc -> [Doc] -> Doc
 encloseSep' left right sep ds
   = case ds of
