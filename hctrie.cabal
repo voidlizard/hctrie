@@ -1,4 +1,4 @@
-name:                lcb
+name:                hctrie
 version:             0.1.0.0
 -- synopsis:            
 -- description:         
@@ -29,11 +29,11 @@ library
   -- hs-source-dirs:       
   default-language:    Haskell2010
 
-executable lcb
+executable hctrie
   main-is:             Main.hs
   other-modules:       LCB.Generate
   build-depends:       base >= 4.7 && < 5,
-                       lcb,
+                       hctrie,
 		       -- I don't know why I need it:
                        containers >= 0.5,
                        -- parse
