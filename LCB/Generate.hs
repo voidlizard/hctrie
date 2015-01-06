@@ -149,7 +149,7 @@ generateTests t a v inputs = vcat
         ]
     , function "int" "has_more" ["void * cc"] $ vcat
         [ "return (input_idx <= input_size);" ]
-    , function "int"   "dump_output" [ "void * cc", "char * result", "int exact", "int consumed"] $ vcat
+    , function "int"   "dump_output" [ "void * cc", "char * result", "int consumed", "int exact"] $ vcat
         [ "current_value = result" <> semi
 	, "current_matched = exact" <> semi
 	, "current_consumed = consumed" <> semi
