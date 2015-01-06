@@ -167,20 +167,20 @@ generateTests t a v inputs = vcat
 	            [ "printf(\"%i: [Error: wrong result %i, should be %i]\\n\",i,current_result,result[i])" <> semi
 		    , "continue" <> semi
 		    ]
-              , if_ "current_matched != should_match[i]" $ vcat
-	            [ "printf(\"%i: [Error: wrong matched %i, should be %i]\\n\",i,current_matched,should_match[i])" <> semi
-		    , "continue" <> semi
-		    ]
-              , if_ "current_consumed != should_consume[i]" $ vcat
-	            [ "printf(\"%i: [Error: wrong consumed %i, should be %i]\\n\",i,current_consumed,should_consume[i])" <> semi
-		    , "continue" <> semi
-		    ]
-{-
-              , if_ "strcmp(!current_value, should_value[i])" $ vcat
-	            [ "printf(\"%i: [Error: values not match]\\n\",i)" <> semi
-		    , "continue" <> semi
-		    ]
-		    -}
+              , if_ "current_result" $ vcat 
+	            [ if_ "current_matched != should_match[i]" $ vcat
+                         [ "printf(\"%i: [Error: wrong matched %i, should be %i]\\n\",i,current_matched,should_match[i])" <> semi
+                         , "continue" <> semi
+                         ]
+                    , if_ "current_consumed != should_consume[i]" $ vcat
+                        [ "printf(\"%i: [Error: wrong consumed %i, should be %i]\\n\",i,current_consumed,should_consume[i])" <> semi
+                        , "continue" <> semi
+                        ]
+                    , if_ "!strcmp(current_value, should_value[i])" $ vcat
+                        [ "printf(\"%i: [Error: values not match]\\n\",i)" <> semi
+                        , "continue" <> semi
+                        ]
+                    ]
               , "printf(\"%i: OK\\n\", i)" <> semi
               ]) <$> rbrace
         ]
