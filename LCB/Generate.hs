@@ -143,12 +143,12 @@ generateTests t a v inputs = vcat
     , "static" <+> "int"    <+> "input_idx"        <+> "=" <+> int 0  <> semi
     , "static" <+> "int"    <+> "input_size"       <+> "=" <+> int 0  <> semi
     , "static" <+> "int *"  <+> "input"            <+> "=" <+> "NULL" <> semi
-    , function uint8_t "feed_input" ["void * index"] $ vcat
-        [ "if" <+> parens ("input_idx >= input_size") <+> "return 0;"
-        , "return input[++input_idx];"
+    , function uint8_t "feed_input" ["void * cc"] $ vcat
+        [ "if" <+> parens ("input_idx > input_size") <+> "return 0;"
+        , "return input[input_idx++];"
         ]
-    , function "int" "has_more" ["void * index"] $ vcat
-        [ "return (input_idx < input_size);" ]
+    , function "int" "has_more" ["void * cc"] $ vcat
+        [ "return (input_idx <= input_size);" ]
     , function "int"   "dump_output" [ "void * cc", "char * result", "int exact", "int consumed"] $ vcat
         [ "current_value = result" <> semi
 	, "current_matched = exact" <> semi
@@ -157,27 +157,26 @@ generateTests t a v inputs = vcat
 	]
     , function "int" "main" ["int argc", "char *argv[]"] $ vcat
         [ "int i =0"     <> semi
-        , "char * input" <> semi
         , "for" <+> parens ("i" <> "=" <> "0" <> ";" <+> "i" <> "<" <> "TESTS_SIZE;" <+> "i++") <>
             nest 4 (lbrace <$> vcat
-              [ "input_idx  = 0" <> semi
+              [ "input_idx  = 1" <> semi
 	      , "input_size = inputs[i][0]" <> semi
 	      , "input      = inputs[i]"    <> semi
-              , "int current_result  = radix_trie(input, has_more, feed_input, dump_output)" <> semi
+              , "int current_result  = radix_trie(0, has_more, feed_input, dump_output)" <> semi
 	      , if_ "current_result != result[i]" $ vcat
-	            [ "printf(\"%i: [Error: wrong result %i, should be %i\",i,current_result,result[i])" <> semi
+	            [ "printf(\"%i: [Error: wrong result %i, should be %i]\\n\",i,current_result,result[i])" <> semi
 		    , "continue" <> semi
 		    ]
               , if_ "current_matched != should_match[i]" $ vcat
-	            [ "printf(\"%i: [Error: wrong matched %i, should be %i\",i,current_matched,should_match[i])" <> semi
+	            [ "printf(\"%i: [Error: wrong matched %i, should be %i]\\n\",i,current_matched,should_match[i])" <> semi
 		    , "continue" <> semi
 		    ]
               , if_ "current_consumed != should_consume[i]" $ vcat
-	            [ "printf(\"%i: [Error: wrong consumed %i, should be %i\",i,current_consumed,should_consume[i])" <> semi
+	            [ "printf(\"%i: [Error: wrong consumed %i, should be %i]\\n\",i,current_consumed,should_consume[i])" <> semi
 		    , "continue" <> semi
 		    ]
               , if_ "strcmp(!current_value, should_value[i])" $ vcat
-	            [ "printf(\"%i: [Error: values not match\",i)" <> semi
+	            [ "printf(\"%i: [Error: values not match]\\n\",i)" <> semi
 		    , "continue" <> semi
 		    ]
               , "printf(\"%i: OK\", i)" <> semi
