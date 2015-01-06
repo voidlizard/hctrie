@@ -11,7 +11,8 @@
 --   * use smth better then monoid for b, we just need mempty,
 --     or rewrite API so monoid will be used in full generality.
 --
---   * use Foldable typeclass to express most of the functions
+--   * use Foldable typeclass to express most of the functions:
+--       keys, values, depth
 module Data.TrieMap
   ( T(..)
   , singleton
@@ -20,9 +21,12 @@ module Data.TrieMap
   , values
   , first
   , second
+    -- experimental
+  , depth
+  , fullKeys
   ) where
 
-import           Data.List (foldl')
+import           Data.List (foldl', nub)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Monoid
@@ -60,3 +64,11 @@ second f (T a m) = T (f a) (Map.map (second f) m)
 
 values :: Ord b => T a b -> Set b
 values (T v m) = Set.insert v $ Set.unions $ Map.elems $ Map.map values m
+
+depth :: Ord b => T a b -> Int
+depth (T a m)
+   | Map.null m = 0
+   | otherwise  = succ $ maximum $ Map.elems $ Map.map depth m
+
+fullKeys :: Ord a => T a b -> [[a]]
+fullKeys (T _ m) = nub $ concat $ Map.elems $ Map.mapWithKey (\k v -> [k]:map (k:) (fullKeys v)) m

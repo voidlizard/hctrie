@@ -7,21 +7,28 @@
 --   * Add documentation into output code
 --   * Generate header files
 --   * Support total alphabet
+{-# LANGUAGE ViewPatterns #-}
 module LCB.Generate
   ( generate 
+  , generateTests
   , output
   ) where
 
 import Text.PrettyPrint.Leijen.Text
 import Data.Text.Lazy.IO as Text
 import Data.Char
+import Control.Monad (replicateM)
 
 import qualified Data.ByteString.Char8 as B8
+import           Data.List
 import           Data.Maybe
 import qualified Data.Map as Map
+import           Data.TrieMap (T(..))
+import qualified Data.TrieMap as Trie
 
 uint8_t :: Doc
 uint8_t = "uint8_t"
+
 
 generate v a r = vcat 
      [ "#include" <+> "<stdint.h>"
@@ -47,7 +54,7 @@ generate v a r = vcat
 				                  <+> tupled [ "void *"
 						             , "char *"
 							     , "int"
-							     , "int"] -- TODO
+							     , "int"]
 				       ]
                                        ) <>
          (nest 4 (lbrace <$> inner) <$> rbrace)
@@ -74,6 +81,119 @@ generate v a r = vcat
        alphabetSize = length a
 
 
+generateHeader = vcat
+    [ "#ifndef RADIX_TREE_H"
+    , "#define RADIX_TREE_H"
+    , "int" <+> "function" <> (tupled [ "void"   <+> "*cc"
+                                      , "int"    <+> parens ("*" <> "has_more_input") <+> parens ("void *")
+                                      , uint8_t  <+> parens ("*" <> "get_input") <+> parens ("void *")
+                                      , "int"    <+> parens ("*" <> "consume_result")
+                                                 <+> tupled [ "void *"
+                                                            , "char *"
+                                                            , "int"
+                                                            , "int"]
+                                      ]) <> semi
+    , "#endif"
+    ]
+
+function :: Doc -> Doc -> [Doc] -> Doc -> Doc
+function tp name params body = tp <+> name <> tupled params <>
+   nest 4 (lbrace <$> body) <$> rbrace
+
+if_ :: Doc -> Doc -> Doc
+if_ cls body = "if" <+> parens cls <>
+  nest 4 (lbrace <$> body) <$> rbrace
+
+generateTests t a v inputs = vcat
+    [ "#include <stdint.h>" 
+    , "#include <stdlib.h>"
+    , "#include <stdio.h>"
+    -- , "#include \"radix.h\""
+    , "#define" <+> "TESTS_SIZE" <+> int (length inputs)
+    , linebreak
+    , "int" <+> "inputs[TESTS_SIZE][500]" <+> "=" <+> 
+        enclose lbrace rbrace
+	  (align (fillCat $ (map (\is -> encloseSep' lbrace rbrace "," (int (length is):map int is) <$$> ",") inputs)))
+	  <> semi
+    , "int" <+> "result[TESTS_SIZE]" <+> "=" <+> 
+	enclose lbrace rbrace
+	  (align (fillCat (intersperse "," $ map int results))) <> semi
+    , "int" <+> "should_match[TESTS_SIZE]" <+> "=" <+>
+        enclose lbrace rbrace
+	  (align (fillCat (intersperse "," $ map int matched))) <> semi
+    , "int" <+> "should_consume[TESTS_SIZE]" <+> "=" <+>
+        enclose lbrace rbrace
+	  (align (fillCat (intersperse "," $ map int consumed))) <> semi
+    , "char *" <+> "should_value[TESTS_SIZE]" <+> "=" <+>
+        encloseSep' lbrace rbrace ", " (map (\i -> dquotes.(<>"\\0").pretty.B8.unpack $ (v!!i)) values) <> semi
+    , linebreak
+    , "static" <+> "char *" <+> "current_value"   <+> "=" <+> "NULL" <> semi
+    , "static" <+> "int"    <+> "current_matched"  <+> "=" <+> int 0  <> semi
+    , "static" <+> "int"    <+> "current_consumed" <+> "=" <+> int 0  <> semi
+    , "static" <+> "int"    <+> "input_idx"        <+> "=" <+> int 0  <> semi
+    , "static" <+> "int"    <+> "input_size"       <+> "=" <+> int 0  <> semi
+    , "static" <+> "int *"  <+> "input"            <+> "=" <+> "NULL" <> semi
+    , function uint8_t "feed_input" ["void * index"] $ vcat
+        [ "if" <+> parens ("input_idx >= inputSize") <+> "return 0;"
+        , "return input[++input_idx];"
+        ]
+    , function uint8_t "has_more" ["void * index"] $ vcat
+        [ "return input_idx < inputSize;" ]
+    , function "int"   "dump_output" [ "void * cc", "char * result", "int exact", "consumed"] $ vcat
+        [ "current_value = result" <> semi
+	, "current_matched = exact" <> semi
+	, "current_consumed = consumed" <> semi
+	, "return 1" <> semi
+	]
+    , function "int" "main" ["int argc", "char *argv[]"] $ vcat
+        [ "int i =0"     <> semi
+        , "char * input" <> semi
+        , "for" <+> parens ("i" <> "=" <> "0" <> ";" <+> "i" <> "<" <> "TESTS_SIZE;" <+> "i++") <>
+            nest 4 (lbrace <$> vcat
+              [ "input_idx  = 0" <> semi
+	      , "input_size = inputs[i][0]" <> semi
+	      , "input      = inputs[i]"    <> semi
+              , "int current_result  = radix_tree(input, feed_input, has_more, dump_output)" <> semi
+	      , if_ "current_result != result[i]" $ vcat
+	            [ "printf(\"%i: [Error: wrong result %i, should be %i\",i,r,result[i])" <> semi
+		    , "continue" <> semi
+		    ]
+              , if_ "current_matched != should_match[i]" $ vcat
+	            [ "printf(\"%i: [Error: wrong matched %i, should be %i\",i,current_matched,should_match[i])" <> semi
+		    , "continue" <> semi
+		    ]
+              , if_ "current_consumed != should_consume[i]" $ vcat
+	            [ "printf(\"%i: [Error: wrong consumed %i, should be %i\",i,current_consumed,should_consume[i])" <> semi
+		    , "continue" <> semi
+		    ]
+              , if_ "strcmp(!current_value, should_value[i]" $ vcat
+	            [ "printf(\"%i: [Error: values not match\",i)" <> semi
+		    , "continue" <> semi
+		    ]
+              , "printf(\"%i: OK\", i)" <> semi
+              ]) <$> rbrace
+        ]
+    ]
+  where
+    main1 = vcat 
+    uDepth  = Trie.depth t + 1
+    (results, matched, consumed, values) = unzip4 $ map (lookupG t . recode) inputs
+    recode  = map (\i -> fromJust $ i `elemIndex` a)
+
+
+lookupG :: (T Int Int) -> [Int] -> (Int, Int, Int, Int)
+lookupG = go 0 
+  where go c (T v m) [] 
+            | v == 0     {- no value  -}  = (0, 0, 0, 0)
+            | Map.null m {- last node -}  = (1, 1, c, v)
+	    | otherwise  {- more nodes -} = (1, 0, c, v)
+	go c (T v m) ((\x -> x `Map.lookup` m -> Just t) :xs)
+	    = go (c+1) t xs
+	go c (T v m) _
+	    | v == 0                        = (0, 0, 0, 0)
+	    | otherwise                     = (1, 0, c, v)
+
+
 buildAlphabet :: [Int] -> [Int]
 buildAlphabet = go 0 1
   where
@@ -92,10 +212,8 @@ mkChunk k (_,(i, m)) = encloseSep' lbrace rbrace "," (int i:typ:map int lst) <$$
     typ 
       | Map.null m = chunkValue
       | otherwise  = chunkNothing
-    
 
 output g = Text.putStrLn $ displayT $ renderPretty 0.8 80 g
-
 
 -- Utilities
 encloseSep' :: Doc -> Doc -> Doc -> [Doc] -> Doc
