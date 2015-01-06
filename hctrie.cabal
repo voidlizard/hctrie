@@ -34,6 +34,7 @@ executable hctrie
   other-modules:       LCB.Generate
   build-depends:       base >= 4.7 && < 5,
                        hctrie,
+                       options >= 1.2,
 		       -- I don't know why I need it:
                        containers >= 0.5,
                        -- parse
