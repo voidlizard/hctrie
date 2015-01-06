@@ -72,7 +72,7 @@ generate v a r = vcat
 	 [ "int i = 0" <> semi
 	 , "int consumed = 0" <> semi
 	 , nest 4 ("do" <+> lbrace <$> do1) <$> rbrace <+> "while (1)" <> semi
-	 , "if (chunks[i][0]) { return 0; }" <> "// no value is associated with node"
+	 , "if (!chunks[i][0]) { return 0; }" <> "// no value is associated with node"
 	 , "consume_result(cc, results[chunks[i][0]], consumed, chunks[i][1])" <> semi
 	 ]
        do1   = vcat
@@ -175,11 +175,13 @@ generateTests t a v inputs = vcat
 	            [ "printf(\"%i: [Error: wrong consumed %i, should be %i]\\n\",i,current_consumed,should_consume[i])" <> semi
 		    , "continue" <> semi
 		    ]
+{-
               , if_ "strcmp(!current_value, should_value[i])" $ vcat
 	            [ "printf(\"%i: [Error: values not match]\\n\",i)" <> semi
 		    , "continue" <> semi
 		    ]
-              , "printf(\"%i: OK\", i)" <> semi
+		    -}
+              , "printf(\"%i: OK\\n\", i)" <> semi
               ]) <$> rbrace
         ]
     ]
