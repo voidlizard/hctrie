@@ -12,6 +12,10 @@ import LCB.Utils
 import LCB.Generate
 import Data.TrieMap
 
+import Control.Monad (forM_)
+import Text.PrettyPrint.Leijen.Text
+import qualified Data.Text.Lazy.IO as Text
+
 main = do
   Right x <- parseFile "1.conf"
   let y = buildTrie x
@@ -25,4 +29,6 @@ main = do
   rnds <- mapM [1..128] $ \i -> do
     ls <- replicateM i (randomRIO (0,255))
   -}
-  output $ generateTests y''' alphabet values tests
+  let xs = generateFiles y''' r alphabet values tests
+  forM_ xs $ \(f,p) ->
+     Text.writeFile f (displayT (renderPretty 0.6 80 p))

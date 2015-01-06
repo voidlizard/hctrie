@@ -12,6 +12,7 @@ module LCB.Generate
   ( generate 
   , generateTests
   , output
+  , generateFiles
   ) where
 
 import Text.PrettyPrint.Leijen.Text
@@ -30,6 +31,12 @@ uint8_t :: Doc
 uint8_t = "uint8_t"
 
 
+generateFiles t v a r ts = 
+     [ ("radix.c", generate v a r)
+     , ("radix.h", generateHeader)
+     , ("radix_tests.c", generateTests t a r ts)
+     ]
+
 generate v a r = vcat 
      [ "#include" <+> "<stdint.h>"
      , "#define" <+> "CHUNK_NUM"   <+> int chunksNo
@@ -47,7 +54,7 @@ generate v a r = vcat
      , "char*" <+> "results" <> brackets "RESULTS_NUM" <+> "=" <+>
          encloseSep' lbrace rbrace ", " (map (dquotes.(<>"\\0").pretty.B8.unpack) r) <> semi
      , linebreak
-     , "int" <+> "function" <> (tupled [ "void"   <+> "*cc"
+     , "int" <+> "radix_trie" <> (tupled [ "void"   <+> "*cc"
                                        , "int"    <+> parens ("*" <> "has_more_input") <+> parens ("void *")
 				       , uint8_t  <+> parens ("*" <> "get_input") <+> parens ("void *")
 				       , "int"    <+> parens ("*" <> "consume_result")
@@ -84,7 +91,7 @@ generate v a r = vcat
 generateHeader = vcat
     [ "#ifndef RADIX_TREE_H"
     , "#define RADIX_TREE_H"
-    , "int" <+> "function" <> (tupled [ "void"   <+> "*cc"
+    , "int" <+> "radix_trie" <> (tupled [ "void"   <+> "*cc"
                                       , "int"    <+> parens ("*" <> "has_more_input") <+> parens ("void *")
                                       , uint8_t  <+> parens ("*" <> "get_input") <+> parens ("void *")
                                       , "int"    <+> parens ("*" <> "consume_result")
