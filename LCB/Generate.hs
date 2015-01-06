@@ -39,6 +39,7 @@ generateFiles t v a r ts =
 
 generate v a r = vcat 
      [ "#include" <+> "<stdint.h>"
+     , "#include" <+> dquotes "radix.h"
      , "#define" <+> "CHUNK_NUM"   <+> int chunksNo
      , "#define" <+> "ALPHABET"    <+> int alphabetSize 
      , "#define" <+> "RESULTS_NUM" <+> int resultsSize
@@ -76,7 +77,7 @@ generate v a r = vcat
 	 ]
        do1   = vcat
 	 [ nest 4 (text "if (!has_more_input(cc))" </> "break" <> semi)
-         , uint8_t <+> "c" <+> "=" <+> "decode(get_input(cc))" <> semi
+         , uint8_t <+> "c" <+> "=" <+> "encode_tbl[get_input(cc)]" <> semi
 	 , nest 4 ("if (c == 0)" </> "break" <> semi)
 	 , "int next = chunks[i][c+2]" <> semi
 	 , "if (next == 0) break" <> semi
@@ -91,6 +92,7 @@ generate v a r = vcat
 generateHeader = vcat
     [ "#ifndef RADIX_TREE_H"
     , "#define RADIX_TREE_H"
+    , "#include" <+> "<stdint.h>"
     , "int" <+> "radix_trie" <> (tupled [ "void"   <+> "*cc"
                                       , "int"    <+> parens ("*" <> "has_more_input") <+> parens ("void *")
                                       , uint8_t  <+> parens ("*" <> "get_input") <+> parens ("void *")
@@ -115,7 +117,8 @@ generateTests t a v inputs = vcat
     [ "#include <stdint.h>" 
     , "#include <stdlib.h>"
     , "#include <stdio.h>"
-    -- , "#include \"radix.h\""
+    , "#include" <+> dquotes "radix.h"
+    , linebreak
     , "#define" <+> "TESTS_SIZE" <+> int (length inputs)
     , linebreak
     , "int" <+> "inputs[TESTS_SIZE][500]" <+> "=" <+> 
@@ -141,12 +144,12 @@ generateTests t a v inputs = vcat
     , "static" <+> "int"    <+> "input_size"       <+> "=" <+> int 0  <> semi
     , "static" <+> "int *"  <+> "input"            <+> "=" <+> "NULL" <> semi
     , function uint8_t "feed_input" ["void * index"] $ vcat
-        [ "if" <+> parens ("input_idx >= inputSize") <+> "return 0;"
+        [ "if" <+> parens ("input_idx >= input_size") <+> "return 0;"
         , "return input[++input_idx];"
         ]
-    , function uint8_t "has_more" ["void * index"] $ vcat
-        [ "return input_idx < inputSize;" ]
-    , function "int"   "dump_output" [ "void * cc", "char * result", "int exact", "consumed"] $ vcat
+    , function "int" "has_more" ["void * index"] $ vcat
+        [ "return (input_idx < input_size);" ]
+    , function "int"   "dump_output" [ "void * cc", "char * result", "int exact", "int consumed"] $ vcat
         [ "current_value = result" <> semi
 	, "current_matched = exact" <> semi
 	, "current_consumed = consumed" <> semi
@@ -160,9 +163,9 @@ generateTests t a v inputs = vcat
               [ "input_idx  = 0" <> semi
 	      , "input_size = inputs[i][0]" <> semi
 	      , "input      = inputs[i]"    <> semi
-              , "int current_result  = radix_tree(input, feed_input, has_more, dump_output)" <> semi
+              , "int current_result  = radix_trie(input, has_more, feed_input, dump_output)" <> semi
 	      , if_ "current_result != result[i]" $ vcat
-	            [ "printf(\"%i: [Error: wrong result %i, should be %i\",i,r,result[i])" <> semi
+	            [ "printf(\"%i: [Error: wrong result %i, should be %i\",i,current_result,result[i])" <> semi
 		    , "continue" <> semi
 		    ]
               , if_ "current_matched != should_match[i]" $ vcat
@@ -173,7 +176,7 @@ generateTests t a v inputs = vcat
 	            [ "printf(\"%i: [Error: wrong consumed %i, should be %i\",i,current_consumed,should_consume[i])" <> semi
 		    , "continue" <> semi
 		    ]
-              , if_ "strcmp(!current_value, should_value[i]" $ vcat
+              , if_ "strcmp(!current_value, should_value[i])" $ vcat
 	            [ "printf(\"%i: [Error: values not match\",i)" <> semi
 		    , "continue" <> semi
 		    ]
