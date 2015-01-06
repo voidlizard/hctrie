@@ -40,11 +40,6 @@ main = runCommand $ \opts args -> do
   let (y'', values)   = normalize y'
   let y'''            = improve 0 y''
   let r               = flatten y'''
-  -- output $ generate r alphabet values
-  {-
-  rnds <- mapM [1..128] $ \i -> do
-    ls <- replicateM i (randomRIO (0,255))
-  -}
-  let xs = generateFiles {-(moPrefix opts)-} y''' r alphabet values tests
+  let xs = generateFiles (moPrefix opts) y''' r alphabet values tests
   forM_ xs $ \(f,p) ->
      Text.writeFile f (displayT (renderPretty 0.6 80 p))

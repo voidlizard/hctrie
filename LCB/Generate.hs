@@ -16,6 +16,7 @@ module LCB.Generate
   ) where
 
 import Text.PrettyPrint.Leijen.Text
+import qualified Data.Text.Lazy    as Text
 import Data.Text.Lazy.IO as Text
 import Data.Char
 import Control.Monad (replicateM)
@@ -30,24 +31,27 @@ import qualified Data.TrieMap as Trie
 uint8_t :: Doc
 uint8_t = "uint8_t"
 
+prefixed :: String -> String -> String
+prefixed "" x = x
+prefixed c  x = c ++ '_':x
 
-generateFiles t v a r ts = 
-     [ ("radix.c", generate v a r)
-     , ("radix.h", generateHeader)
-     , ("radix_tests.c", generateTests t a r ts)
+generateFiles p t v a r ts = 
+     [ (prefixed p "radix.c",       generate p v a r)
+     , (prefixed p "radix.h",       generateHeader p)
+     , (prefixed p "radix_tests.c", generateTests p t a r ts)
      ]
 
-generate v a r = vcat 
+generate p v a r = vcat 
      [ "#include" <+> "<stdint.h>"
      , "#include" <+> dquotes "radix.h"
      , "#define" <+> "CHUNK_NUM"   <+> int chunksNo
      , "#define" <+> "ALPHABET"    <+> int alphabetSize 
      , "#define" <+> "RESULTS_NUM" <+> int resultsSize
      , linebreak
-     , uint8_t <+> "encode_tbl" <> "[]" <+> "=" <+> 
+     , "static" <+> uint8_t <+> "encode_tbl" <> "[]" <+> "=" <+> 
          encloseSep' lbrace rbrace "," (map int (buildAlphabet a)) <> semi
      , linebreak
-     , "int" <+> "chunks" <> brackets "CHUNK_NUM" <> brackets "ALPHABET+2" <+> "=" <+>
+     , "static" <+> "int" <+> "chunks" <> brackets "CHUNK_NUM" <> brackets "ALPHABET+2" <+> "=" <+>
          enclose lbrace rbrace
 	    (align (fillCat $ (map (mkChunk  alphabetSize) v))) -- TODO: use nest
 	 <> semi
@@ -55,17 +59,17 @@ generate v a r = vcat
      , "char*" <+> "results" <> brackets "RESULTS_NUM" <+> "=" <+>
          encloseSep' lbrace rbrace ", " (map (dquotes.(<>"\\0").pretty.B8.unpack) r) <> semi
      , linebreak
-     , "int" <+> "radix_trie" <> (tupled [ "void"   <+> "*cc"
-                                       , "int"    <+> parens ("*" <> "has_more_input") <+> parens ("void *")
-				       , uint8_t  <+> parens ("*" <> "get_input") <+> parens ("void *")
-				       , "int"    <+> parens ("*" <> "consume_result")
-				                  <+> tupled [ "void *"
-						             , "char *"
-							     , "int"
-							     , "int"]
-				       ]
-                                       ) <>
-         (nest 4 (lbrace <$> inner) <$> rbrace)
+     , "int" <+> (string $ Text.pack $ prefixed p "radix_trie")
+             <> (tupled [ "void"   <+> "*cc"
+                        , "int"    <+> parens ("*" <> "has_more_input") <+> parens ("void *")
+                        , uint8_t  <+> parens ("*" <> "get_input") <+> parens ("void *")
+                        , "int"    <+> parens ("*" <> "consume_result")
+                                            <+> tupled [ "void *"
+                                                       , "char *"
+                                                       , "int"
+                                                       , "int"]
+                        ]
+              ) <> (nest 4 (lbrace <$> inner) <$> rbrace)
      ]
      where
        inner = vcat 
@@ -89,19 +93,20 @@ generate v a r = vcat
        alphabetSize = length a
 
 
-generateHeader = vcat
-    [ "#ifndef RADIX_TREE_H"
-    , "#define RADIX_TREE_H"
+generateHeader p = vcat
+    [ "#ifndef" <+> (string $ Text.pack $ prefixed (map toUpper p) "RADIX_TREE_H")
+    , "#define" <+> (string $ Text.pack $ prefixed (map toUpper p) "RADIX_TREE_H")
     , "#include" <+> "<stdint.h>"
-    , "int" <+> "radix_trie" <> (tupled [ "void"   <+> "*cc"
-                                      , "int"    <+> parens ("*" <> "has_more_input") <+> parens ("void *")
-                                      , uint8_t  <+> parens ("*" <> "get_input") <+> parens ("void *")
-                                      , "int"    <+> parens ("*" <> "consume_result")
-                                                 <+> tupled [ "void *"
-                                                            , "char *"
-                                                            , "int"
-                                                            , "int"]
-                                      ]) <> semi
+    , "int" <+> (string $ Text.pack $ prefixed p "radix_trie")
+            <> (tupled [ "void"   <+> "*cc"
+                       , "int"    <+> parens ("*" <> "has_more_input") <+> parens ("void *")
+                       , uint8_t  <+> parens ("*" <> "get_input") <+> parens ("void *")
+                       , "int"    <+> parens ("*" <> "consume_result")
+                                  <+> tupled [ "void *"
+                                             , "char *"
+                                             , "int"
+                                             , "int"]
+                       ]) <> semi
     , "#endif"
     ]
 
@@ -113,11 +118,11 @@ if_ :: Doc -> Doc -> Doc
 if_ cls body = "if" <+> parens cls <>
   nest 4 (lbrace <$> body) <$> rbrace
 
-generateTests t a v inputs = vcat
+generateTests p t a v inputs = vcat
     [ "#include <stdint.h>" 
     , "#include <stdlib.h>"
     , "#include <stdio.h>"
-    , "#include" <+> dquotes "radix.h"
+    , "#include" <+> dquotes (string $ Text.pack $ prefixed p "radix.h")
     , linebreak
     , "#define" <+> "TESTS_SIZE" <+> int (length inputs)
     , linebreak
@@ -162,7 +167,8 @@ generateTests t a v inputs = vcat
               [ "input_idx  = 1" <> semi
 	      , "input_size = inputs[i][0]" <> semi
 	      , "input      = inputs[i]"    <> semi
-              , "int current_result  = radix_trie(0, has_more, feed_input, dump_output)" <> semi
+              , "int current_result  =" <+> (string $ Text.pack $ prefixed p "radix_trie")
+                                        <> "(0, has_more, feed_input, dump_output)" <> semi
 	      , if_ "current_result != result[i]" $ vcat
 	            [ "printf(\"%i: [Error: wrong result %i, should be %i]\\n\",i,current_result,result[i])" <> semi
 		    , "continue" <> semi
