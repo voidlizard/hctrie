@@ -40,7 +40,7 @@ buildTrie = go (Trie.singleton "")
 
 -- | Recode keys, so they use keys from alphabet
 recode :: (Ord a) => T a b -> (T Int b, [a])
-recode t = (Trie.first (\i -> fromJust $ i `elemIndex` m) t, m)
+recode t = (Trie.first (\i -> succ $ fromJust $ i `elemIndex` m) t, m)
   where m = Set.toList $ Trie.keys t
 
 -- | Normalize resuls.

@@ -79,7 +79,7 @@ generate v a r = vcat
 	 [ nest 4 (text "if (!has_more_input(cc))" </> "break" <> semi)
          , uint8_t <+> "c" <+> "=" <+> "encode_tbl[get_input(cc)]" <> semi
 	 , nest 4 ("if (c == 0)" </> "break" <> semi)
-	 , "int next = chunks[i][c+2]" <> semi
+	 , "int next = chunks[i][c+2]" <> semi <+> "// zero is ommited, (not a case in full alphabet)"
 	 , "if (next == 0) break" <> semi
 	 , "i = next" <> semi
 	 , "++consumed" <> semi
