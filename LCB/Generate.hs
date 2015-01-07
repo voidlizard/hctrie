@@ -183,8 +183,8 @@ generateTests p t a v inputs = vcat
                         [ "printf(\"%i: [Error: wrong consumed %i, should be %i]\\n\",i,current_consumed,should_consume[i])" <> semi
                         , "continue" <> semi
                         ]
-                    , if_ "!strcmp(current_value, should_value[i])" $ vcat
-                        [ "printf(\"%i: [Error: values not match]\\n\",i)" <> semi
+                    , if_ "strcmp(should_value[i], current_value)" $ vcat
+                        [ "printf(\"%i: [Error: values not match %s, against %s]\\n\",i,current_value,should_value[i])" <> semi
                         , "continue" <> semi
                         ]
                     ]
@@ -196,20 +196,17 @@ generateTests p t a v inputs = vcat
     main1 = vcat 
     uDepth  = Trie.depth t + 1
     (results, matched, consumed, values) = unzip4 $ map (lookupG t . recode) inputs
-    recode  = map (\i -> fromJust $ i `elemIndex` a)
+    recode  = map (\i -> fromJust $ i `elemIndex` ((-1):a))
 
 
 lookupG :: (T Int Int) -> [Int] -> (Int, Int, Int, Int)
 lookupG = go 0 
   where go c (T v m) [] 
-            | v == 0     {- no value  -}  = (0, 0, 0, 0)
-            | Map.null m {- last node -}  = (1, 1, c, v)
-	    | otherwise  {- more nodes -} = (1, 0, c, v)
+            = (fromEnum (v/=0), fromEnum (Map.null m), c, v)
 	go c (T v m) ((\x -> x `Map.lookup` m -> Just t) :xs)
 	    = go (c+1) t xs
 	go c (T v m) _
-	    | v == 0                        = (0, 0, 0, 0)
-	    | otherwise                     = (1, 0, c, v)
+	    = (fromEnum (v/=0), 0, c, v)
 
 
 buildAlphabet :: [Int] -> [Int]
