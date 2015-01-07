@@ -62,13 +62,7 @@ generate p v a r = vcat
      , linebreak
      , "int" <+> (string $ Text.pack $ prefixed p "radix_trie")
              <> (tupled [ "void"   <+> "*cc"
-                        , "int"    <+> parens ("*" <> "has_more_input") <+> parens ("void *")
-                        , uint8_t  <+> parens ("*" <> "get_input") <+> parens ("void *")
-                        , "int"    <+> parens ("*" <> "consume_result")
-                                            <+> tupled [ "void *"
-                                                       , "char *"
-                                                       , "int"
-                                                       , "int"]
+                        , (string $ Text.pack $ prefixed p "radix_trie_clb_t") <+> "*cb"
                         ]
               ) <> (nest 4 (lbrace <$> inner) <$> rbrace)
      ]
@@ -78,11 +72,11 @@ generate p v a r = vcat
 	 , "int consumed = 0" <> semi
 	 , nest 4 ("do" <+> lbrace <$> do1) <$> rbrace <+> "while (1)" <> semi
 	 , "if (!chunks[i][0]) { return 0; }" <> "// no value is associated with node"
-	 , "consume_result(cc, results[chunks[i][0]], consumed, chunks[i][1])" <> semi
+	 , "cb->consume_result(cc, results[chunks[i][0]], consumed, chunks[i][1])" <> semi
 	 ]
        do1   = vcat
-	 [ nest 4 (text "if (!has_more_input(cc))" </> "break" <> semi)
-         , uint8_t <+> "c" <+> "=" <+> "encode_tbl[get_input(cc)]" <> semi
+	 [ nest 4 (text "if (!cb->has_more_input(cc))" </> "break" <> semi)
+         , uint8_t <+> "c" <+> "=" <+> "encode_tbl[cb->get_input(cc)]" <> semi
 	 , nest 4 ("if (c == 0)" </> "break" <> semi)
 	 , "int next = chunks[i][c+1]" <> semi <+> "// zero is ommited, (not a case in full alphabet)"
 	 , "if (next == 0) break" <> semi
@@ -98,18 +92,25 @@ generateHeader p = vcat
     [ "#ifndef" <+> (string $ Text.pack $ prefixed (map toUpper p) "RADIX_TREE_H")
     , "#define" <+> (string $ Text.pack $ prefixed (map toUpper p) "RADIX_TREE_H")
     , "#include" <+> "<stdint.h>"
-    , "int" <+> (string $ Text.pack $ prefixed p "radix_trie")
-            <> (tupled [ "void"   <+> "*cc"
-                       , "int"    <+> parens ("*" <> "has_more_input") <+> parens ("void *")
-                       , uint8_t  <+> parens ("*" <> "get_input") <+> parens ("void *")
+    , linebreak
+    , "typedef" <+> "struct" <+> radix_trie_clb <>
+        nest 4 (lbrace <$> vcat
+                       [ "int"    <+> parens ("*" <> "has_more_input") <+> parens ("void *") <> semi
+                       , uint8_t  <+> parens ("*" <> "get_input") <+> parens ("void *") <> semi
                        , "int"    <+> parens ("*" <> "consume_result")
                                   <+> tupled [ "void *"
                                              , "char *"
                                              , "int"
-                                             , "int"]
+                                             , "int" ] <> semi
+                      ]) <$> rbrace <+> radix_trie_clb <> "_t" <> semi
+    , "int" <+> (string $ Text.pack $ prefixed p "radix_trie")
+            <> (tupled [ "void"   <+> "*cc"
+                       , radix_trie_clb <> "_t" <+> "*callback"
                        ]) <> semi
     , "#endif"
     ]
+    where
+      radix_trie_clb = (string $ Text.pack $ prefixed p "radix_trie_clb") 
 
 function :: Doc -> Doc -> [Doc] -> Doc -> Doc
 function tp name params body = tp <+> name <> tupled params <>
@@ -163,13 +164,15 @@ generateTests p t a v inputs = vcat
 	]
     , function "int" "main" ["int argc", "char *argv[]"] $ vcat
         [ "int i =0"     <> semi
+        , (string $ Text.pack $ prefixed p "radix_trie_clb_t") <+> "cb" <+> "="
+	        <+> encloseSep lbrace rbrace "," ["has_more", "feed_input", "dump_output" ] <> semi
         , "for" <+> parens ("i" <> "=" <> "0" <> ";" <+> "i" <> "<" <> "TESTS_SIZE;" <+> "i++") <>
             nest 4 (lbrace <$> vcat
               [ "input_idx  = 1" <> semi
 	      , "input_size = inputs[i][0]" <> semi
 	      , "input      = inputs[i]"    <> semi
               , "int current_result  =" <+> (string $ Text.pack $ prefixed p "radix_trie")
-                                        <> "(0, has_more, feed_input, dump_output)" <> semi
+                                        <> "(0, &cb)" <> semi
 	      , if_ "current_result != result[i]" $ vcat
 	            [ "printf(\"%i: [Error: wrong result %i, should be %i]\\n\",i,current_result,result[i])" <> semi
 		    , "continue" <> semi
