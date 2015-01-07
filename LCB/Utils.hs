@@ -64,12 +64,3 @@ flatten = snd . go 0
         ((i',ls), m') = Map.mapAccumWithKey f (i+1,[]) m
 	f (j,ks) k t = let (j', ks') = go j t
 	               in ((j', ks++ks'), j)
-
-{-
-pp = T 0 (Map.fromList [('1', T 1 Map.empty)
-                       ,('2', T 2 Map.empty)
-		       ])
-
-zz :: (Ord b, Ord a) => T a b -> [(Int,(Int, Map Int Int))]
-zz = foldrk . normalize . recode
--}
