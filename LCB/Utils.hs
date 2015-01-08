@@ -7,12 +7,14 @@
 --   TODO:
 --
 --     * rewrite improve so exposing internal structure will not be needed.
+{-# LANGUAGE TupleSections #-}
 module LCB.Utils
   ( recode
   , normalize
   , improve
   , flatten
   , buildFingerprintTrie
+  , prepareFingerprintValues
   ) where
 
 import           LCB.Parse (Section(..), Ini)
@@ -27,6 +29,8 @@ import qualified Data.Set as Set
 import           Data.Map ( Map )
 import qualified Data.Map as Map
 
+import Language.C.Generate.Parse
+
 buildFingerprintTrie :: Ini -> T Int ByteString
 buildFingerprintTrie = go (Trie.singleton "")
  where go t [] = t
@@ -36,6 +40,15 @@ buildFingerprintTrie = go (Trie.singleton "")
 	  = go (Prelude.foldr (\f t' -> Trie.insert (prepare f) ds t') t fp) xs
 	  where prepare k = read $ "[" ++ (B8.unpack k) ++ "]" :: [Int]
        go t (_:xs) = go t xs
+
+prepareFingerprintValues :: Ini -> [(ByteString, [ParseValue])]
+prepareFingerprintValues [] = []
+prepareFingerprintValues ((Section _ vls):xs)
+   | Just fp <- "fingerprints" `Prelude.lookup` vls
+   , Just [ds] <- "description" `Prelude.lookup` vls
+   = [(f, [PVBS ds]) | f <- fp] ++ prepareFingerprintValues xs
+prepareFingerprintValues (_:xs) = prepareFingerprintValues xs
+
 
 -- | Recode keys, so they use keys from alphabet
 recode :: (Ord a) => T a b -> (T Int b, [a])

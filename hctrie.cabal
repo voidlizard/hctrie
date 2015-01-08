@@ -18,9 +18,11 @@ library
                        LCB.Utils
                        LCB.Generate
                        Language.C.Generate.Types
+                       Language.C.Generate.Parse
   default-extensions:  OverloadedStrings
   -- other-modules:       
-  -- other-extensions:    
+  other-extensions:    ExistentialQuantification
+                       TupleSections
   build-depends:       base >=4.7 && <4.8,
                        containers >= 0.5,
 

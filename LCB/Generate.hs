@@ -132,10 +132,11 @@ if_ :: Doc -> Doc -> Doc
 if_ cls body = "if" <+> parens cls <>
   nest 4 (lbrace <$> body) <$> rbrace
 
-generateTests :: String
+generateTests :: CShow a
+              => String
               -> T Int Int
               -> [Int]
-              -> [B8.ByteString]
+              -> [a]
               -> [[Int]]
               -> Doc
 generateTests p t a v inputs = vcat
@@ -160,7 +161,7 @@ generateTests p t a v inputs = vcat
         enclose lbrace rbrace
 	  (align (fillCat (intersperse "," $ map int consumed))) <> semi
     , "char *" <+> "should_value[TESTS_SIZE]" <+> "=" <+>
-        encloseSep' lbrace rbrace ", " (map (\i -> dquotes.(<>"\\0").pretty.B8.unpack $ (v!!i)) values) <> semi
+        encloseSep' lbrace rbrace ", " (map (\i -> cshow (v!!i)) values) <> semi
     , linebreak
     , "static" <+> "char *" <+> "current_value"   <+> "=" <+> "NULL" <> semi
     , "static" <+> "int"    <+> "current_matched"  <+> "=" <+> int 0  <> semi
