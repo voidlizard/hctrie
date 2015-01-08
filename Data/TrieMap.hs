@@ -55,9 +55,9 @@ singleton v = T (Just v) Map.empty
 
 -- | Return all map keys in ascending order.
 keys :: Ord a => T a b -> Set a
-keys (T _ m) = foldl' (\b a -> b `Set.union` a)
-                          (Set.fromList (Map.keys m))
-			  (Map.elems $ Map.map keys m)
+keys (T _ m) = foldl'  Set.union
+                      (Set.fromList (Map.keys m))
+                      (Map.elems $ Map.map keys m)
 
 
 first :: Ord b => (a -> b) -> T a c -> T b c

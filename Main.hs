@@ -1,16 +1,11 @@
 -- | Copyright: (c) 2015, Alexander Vershilov
 --   Author:    Alexander Vershilov <alexander.vershilov@gmail.com>
---
--- TODO:
---   * parse options
---   * generate files
---
+-- 
 module Main (main) where
 
-import LCB.Parse
-import LCB.Utils
 import LCB.Generate
 import Data.TrieMap
+import Data.TrieMap.Utils
 
 import Options
 import Control.Applicative

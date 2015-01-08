@@ -105,12 +105,6 @@ unescape = many1 p
           | w >= 97            = w - 87
           | otherwise          = w - 55
       mkDec a b c = ((c2w a - 48) * 100) + ((c2w b - 48) * 10) + c2w c - 48
-{-
-             ("\\x" *> liftA2 mkHex (c2w <$> satisfy (isHexDigit.c2w))
-                                    (c2w <$> satisfy (isHexDigit.c2w)))
-             <|> ("\\"  *> liftA3 mkDec digit digit digit)
-             <|> (c2w   <$> anyChar)
-	     -}
 
 quotedField :: Parser ByteString
 quotedField = char '"' *> A.takeWhile1 (/= '"')  <* char '"'

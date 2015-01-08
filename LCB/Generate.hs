@@ -1,12 +1,7 @@
 -- | Copyright: (c) 2015, Alexander Vershilov
 --   Author:    Alexander Vershilov <alexander.vershilov@gmail.com>
 --
--- TODO: 
---   * Read prefixes
---   * Add documentation
---   * Add documentation into output code
---   * Generate header files
---   * Support total alphabet
+--  XXX: Support total alphabet
 {-# LANGUAGE ViewPatterns #-}
 module LCB.Generate
   ( generate 

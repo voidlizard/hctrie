@@ -14,8 +14,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Data.TrieMap
-                       LCB.Parse
-                       LCB.Utils
+                       Data.TrieMap.Utils
                        LCB.Generate
                        Language.C.Generate.Types
                        Language.C.Generate.Parse
