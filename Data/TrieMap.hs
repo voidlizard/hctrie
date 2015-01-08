@@ -66,7 +66,7 @@ values :: Ord b => T a b -> Set b
 values (T v m) = Set.insert v $ Set.unions $ Map.elems $ Map.map values m
 
 depth :: Ord b => T a b -> Int
-depth (T a m)
+depth (T _ m)
    | Map.null m = 0
    | otherwise  = succ $ maximum $ Map.elems $ Map.map depth m
 

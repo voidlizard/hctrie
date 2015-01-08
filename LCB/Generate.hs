@@ -11,7 +11,6 @@
 module LCB.Generate
   ( generate 
   , generateTests
-  , output
   , generateFiles
   , lookupG
   ) where
@@ -20,16 +19,13 @@ import Language.C.Generate.Types
 
 import Text.PrettyPrint.Leijen.Text
 import qualified Data.Text.Lazy    as Text
-import Data.Text.Lazy.IO as Text
 import Data.Char
-import Control.Monad (replicateM)
 
 import qualified Data.ByteString.Char8 as B8
 import           Data.List
 import           Data.Maybe
 import qualified Data.Map as Map
 import           Data.TrieMap (T(..))
-import qualified Data.TrieMap as Trie
 
 uint8_t :: Doc
 uint8_t = "uint8_t"
@@ -38,12 +34,25 @@ prefixed :: String -> String -> String
 prefixed "" x = x
 prefixed c  x = c ++ '_':x
 
+generateFiles :: String
+              -> T Int Int
+              -> [(t, (Int, Map.Map Int Int))]
+              -> [Int]
+              -> [B8.ByteString]
+              -> [[Int]]
+              -> [(String, Doc)]
 generateFiles p t v a r ts = 
      [ (prefixed p "radix.c",       generate p v a r)
      , (prefixed p "radix.h",       generateHeader p)
      , (prefixed p "radix_tests.c", generateTests p t a r ts)
      ]
 
+generate :: CShow a
+         => String
+         -> [(t, (Int, Map.Map Int Int))]
+         -> [Int]
+         -> [a]
+         -> Doc
 generate p v a r = vcat 
      [ "#include" <+> "<stdint.h>"
      , "#include" <+> dquotes "radix.h"
@@ -90,6 +99,7 @@ generate p v a r = vcat
        alphabetSize = length a
 
 
+generateHeader :: String -> Doc
 generateHeader p = vcat
     [ "#ifndef" <+> (string $ Text.pack $ prefixed (map toUpper p) "RADIX_TREE_H")
     , "#define" <+> (string $ Text.pack $ prefixed (map toUpper p) "RADIX_TREE_H")
@@ -122,6 +132,12 @@ if_ :: Doc -> Doc -> Doc
 if_ cls body = "if" <+> parens cls <>
   nest 4 (lbrace <$> body) <$> rbrace
 
+generateTests :: String
+              -> T Int Int
+              -> [Int]
+              -> [B8.ByteString]
+              -> [[Int]]
+              -> Doc
 generateTests p t a v inputs = vcat
     [ "#include <stdint.h>" 
     , "#include <stdlib.h>"
@@ -198,8 +214,6 @@ generateTests p t a v inputs = vcat
         ]
     ]
   where
-    main1 = vcat 
-    uDepth  = Trie.depth t + 1
     (results, matched, consumed, values) = unzip4 $ map (lookupG t . recode) inputs
     recode  = map (\i -> fromJust $ i `elemIndex` ((-1):a))
 
@@ -208,9 +222,9 @@ lookupG :: (T Int Int) -> [Int] -> (Int, Int, Int, Int)
 lookupG = go 0 
   where go c (T v m) [] 
             = (fromEnum (v/=0), fromEnum (Map.null m), c, v)
-	go c (T v m) ((\x -> x `Map.lookup` m -> Just t) :xs)
+	go c (T _ m) ((\x -> x `Map.lookup` m -> Just t) :xs)
 	    = go (c+1) t xs
-	go c (T v m) _
+	go c (T v _) _
 	    = (fromEnum (v/=0), 0, c, v)
 
 
@@ -223,22 +237,21 @@ buildAlphabet = go 0 1
       | otherwise = 0:go (c+1) v     (x:xs)
     go c _ []     = replicate (256-c) 0
 
-chunkNothing = int 0
-chunkValue   = int 1
-
+mkChunk :: (Ord k, Num k, Enum k)
+        => k
+	-> (t, (Int, Map.Map k Int))
+	-> Doc
 mkChunk k (_,(i, m)) = encloseSep' lbrace rbrace "," (int i:typ:map int lst) <$$> ","
   where
     lst = [fromMaybe 0 (Map.lookup j m) | j <- [1..k]]
     typ 
-      | Map.null m = chunkValue
-      | otherwise  = chunkNothing
-
-output g = Text.putStrLn $ displayT $ renderPretty 0.8 80 g
+      | Map.null m = int 1 
+      | otherwise  = int 0 
 
 -- Utilities
 encloseSep' :: Doc -> Doc -> Doc -> [Doc] -> Doc
-encloseSep' left right sep ds
+encloseSep' left right sep' ds
   = case ds of
         []  -> left <> right
 	[d] -> left <> d <> right
-	_   -> align (fillCat (zipWith (<>) (left : repeat sep) ds) <> right)
+	_   -> align (fillCat (zipWith (<>) (left : repeat sep') ds) <> right)

@@ -16,6 +16,7 @@ library
   exposed-modules:     Data.TrieMap
                        LCB.Parse
                        LCB.Utils
+                       LCB.Generate
                        Language.C.Generate.Types
   default-extensions:  OverloadedStrings
   -- other-modules:       
@@ -25,10 +26,11 @@ library
 
                        wl-pprint-text,
                        -- parse
+                       text,
                        attoparsec >= 0.12.1.2,
                        bytestring >= 0.10
 
-  -- hs-source-dirs:       
+  ghc-options:         -Wall -Werror
   default-language:    Haskell2010
 
 executable hctrie

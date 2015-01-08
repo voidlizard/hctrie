@@ -12,7 +12,6 @@ import           Data.Either (rights)
 import           Data.Attoparsec.ByteString.Char8 as A
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as B8
 
 type Title = ByteString
 type Name  = ByteString
@@ -30,6 +29,7 @@ comment = void $ string "#" *> A.takeWhile (/= '\n') <* endOfLine
 section :: Parser Section
 section = Section <$> title <*> values
 
+title :: Parser ByteString
 title = skipSpace *> char '[' *> A.takeWhile ( /= ']') <* char ']' <* endOfLine
 
 values :: Parser [(Name,Values)]
@@ -44,6 +44,7 @@ value = do mx <- peekChar
 	       | x == '#'  -> comment >> value
 	       | otherwise -> fail "no more"
 
+vl, multiline :: Parser [ByteString]
 vl =  (string "<<" *> multiline)
    <|> (((:[]) <$> A.takeWhile (/= '\n')) <* endOfLine)
 

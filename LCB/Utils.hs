@@ -30,7 +30,7 @@ import qualified Data.Map as Map
 buildFingerprintTrie :: Ini -> T Int ByteString
 buildFingerprintTrie = go (Trie.singleton "")
  where go t [] = t
-       go t ((Section hdr vls):xs)
+       go t ((Section _ vls):xs)
           | Just fp <- "fingerprints" `Prelude.lookup` vls
 	  , Just [ds] <- "description"   `Prelude.lookup` vls
 	  = go (Prelude.foldr (\f t' -> Trie.insert (prepare f) ds t') t fp) xs
@@ -61,7 +61,7 @@ flatten = snd . go 0
     go i (T v m) = (i', (i,(v,m')):ls)
       where
         ((i',ls), m') = Map.mapAccumWithKey f (i+1,[]) m
-	f (j,ks) k t = let (j', ks') = go j t
+	f (j,ks) _ t = let (j', ks') = go j t
 	               in ((j', ks++ks'), j)
 
 
