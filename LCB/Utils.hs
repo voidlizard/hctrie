@@ -29,6 +29,7 @@ import           Data.Maybe
 import qualified Data.Set as Set
 import           Data.Map ( Map )
 import qualified Data.Map as Map
+import           Data.Word
 
 import Language.C.Generate.Parse
 
@@ -50,10 +51,8 @@ prepareFingerprintValues ((Section _ vls):xs)
    = [(f, [PVBS ds]) | f <- fp] ++ prepareFingerprintValues xs
 prepareFingerprintValues (_:xs) = prepareFingerprintValues xs
 
-buildTrie :: [(ByteString, a)] -> T Int a
-buildTrie = Prelude.foldr (\(f,x) t' -> Trie.insert (prepare f) x t') Trie.empty
-  where prepare k = read $ "[" ++ (B8.unpack k) ++ "]" :: [Int]
-
+buildTrie :: [([Word8], a)] -> T Int a
+buildTrie = Prelude.foldr (\(f,x) t' -> Trie.insert (map fromIntegral f) x t') Trie.empty
         
 
 -- | Recode keys, so they use keys from alphabet

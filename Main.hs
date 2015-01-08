@@ -16,7 +16,8 @@ import Options
 import Control.Applicative
 import Control.Monad (forM_)
 import Data.Maybe
-import Text.PrettyPrint.Leijen.Text
+import qualified Data.ByteString as B
+import Text.PrettyPrint.Leijen.Text (displayT, renderPretty)
 import qualified Data.Text.Lazy.IO as Text
 
 import Language.C.Generate.Parse
@@ -36,14 +37,16 @@ instance Options MainOptions where
 
 main = runCommand $ \opts args -> do
   let finput = moInput opts
-  Right x <- parseFile finput
-  let ny = map (fmap parseFields) $ prepareFingerprintValues x
-  let y = buildTrie ny
-  let tests = fullKeys y
-  let (y', alphabet)  = recode y
-  let (y'', values)   = normalize y'
-  let y'''            = improve y''
-  let r               = flatten y'''
-  let xs = generateFiles (moPrefix opts) y''' r alphabet values tests
-  forM_ xs $ \(f,p) ->
-     Text.writeFile f (displayT (renderPretty 0.6 80 p))
+  eny <- parseCSVLike <$> B.readFile finput
+  case eny of
+    Left s -> do putStrLn $ "Error reading file: " ++ s
+    Right ny -> do
+      let y = buildTrie $ map (\(Conf k v) -> (k, v)) ny
+      let tests = fullKeys y
+      let (y', alphabet)  = recode y
+      let (y'', values)   = normalize y'
+      let y'''            = improve y''
+      let r               = flatten y'''
+      let xs = generateFiles (moPrefix opts) y''' r alphabet values tests
+      forM_ xs $ \(f,p) ->
+         Text.writeFile f (displayT (renderPretty 0.6 80 p))

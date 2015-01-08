@@ -5,8 +5,7 @@ module Language.C.Generate.Parse
   ( parseFields
   , ParseValue(..)
   , Conf(..)
-  , conf
-  , test
+  , parseCSVLike
   ) where
 
 import Language.C.Generate.Types
@@ -19,8 +18,6 @@ import           Data.Word
 
 import Data.ByteString.Internal (c2w)
 import           Data.Attoparsec.ByteString.Char8 as A
-
-import Debug.Trace
 
 -- | Values that are supported in parser
 data ParseValue = PVInt Int
@@ -46,10 +43,10 @@ parseField :: ParseValue -> SomeCValue
 parseField (PVInt i)  = SomeCValue i
 parseField (PVBS  s)  = SomeCValue s
 
-data Conf = Conf [Word8] [ParseValue] deriving (Eq, Show)
+data Conf = Conf [Word8] SomeCValue deriving (Eq, Show)
 
 conf :: Parser [Conf]
-conf = fmap (uncurry Conf) . catMaybes <$> confLine `sepBy` endOfLine
+conf = fmap (\(k, v) -> Conf k (parseFields v)) . catMaybes <$> confLine `sepBy` endOfLine
 
 delimeter :: Char
 delimeter = '|'
@@ -63,10 +60,8 @@ confLine = choice [ pure Nothing <* comment
     comment = void "#"
 
     line :: Parser ([Word8], [ParseValue])
-    line = do traceM "here"
-              (,) <$> key
-                  <*> many1 field
-		  -- <*  skipSpace <* endOfLine
+    line = (,) <$> key
+               <*> many1 field
 
     key :: Parser [Word8]
     key = do
@@ -123,5 +118,5 @@ quotedField = char '"' *> A.takeWhile1 (/= '"')  <* char '"'
 unquotedField :: Parser ByteString
 unquotedField = A.takeWhile1 (liftA2 (&&) (/= '\n') (/= delimeter))
 
-test :: ByteString -> Either String [Conf]
-test = parseOnly conf
+parseCSVLike :: ByteString -> Either String [Conf]
+parseCSVLike = parseOnly conf
