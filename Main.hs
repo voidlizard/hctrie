@@ -37,8 +37,8 @@ instance Options MainOptions where
 main = runCommand $ \opts args -> do
   let finput = moInput opts
   Right x <- parseFile finput
-  let y = buildFingerprintTrie x
   let ny = map (fmap parseFields) $ prepareFingerprintValues x
+  let y = buildTrie ny
   let tests = fullKeys y
   let (y', alphabet)  = recode y
   let (y'', values)   = normalize y'

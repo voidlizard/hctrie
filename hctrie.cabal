@@ -23,6 +23,8 @@ library
   -- other-modules:       
   other-extensions:    ExistentialQuantification
                        TupleSections
+                       DeriveDataTypeable
+                       StandaloneDeriving
   build-depends:       base >=4.7 && <4.8,
                        containers >= 0.5,
 

@@ -15,6 +15,7 @@
 --       keys, values, depth
 module Data.TrieMap
   ( T(..)
+  , empty
   , singleton
   , insert
   , keys
@@ -42,6 +43,10 @@ insert []     v (T _ b)  = T (Just v) b
 insert (x:xs) v (T a bs) = T a (Map.alter go x bs)
   where go Nothing  = Just $ insert xs v (T Nothing Map.empty)
         go (Just t) = Just $ insert xs v t
+
+-- | Create empty Trie
+empty :: T a b
+empty = T Nothing Map.empty
 
 -- | Create an one element tree with the specified value in
 -- the root node.

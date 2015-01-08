@@ -21,7 +21,6 @@ import Text.PrettyPrint.Leijen.Text
 import qualified Data.Text.Lazy    as Text
 import Data.Char
 
-import qualified Data.ByteString.Char8 as B8
 import           Data.List
 import           Data.Maybe
 import qualified Data.Map as Map
@@ -34,11 +33,12 @@ prefixed :: String -> String -> String
 prefixed "" x = x
 prefixed c  x = c ++ '_':x
 
-generateFiles :: String
+generateFiles :: CShow a
+              => String
               -> T Int Int
               -> [(t, (Maybe Int, Map.Map Int Int))]
               -> [Int]
-              -> [B8.ByteString]
+              -> [a]
               -> [[Int]]
               -> [(String, Doc)]
 generateFiles p t v a r ts = 

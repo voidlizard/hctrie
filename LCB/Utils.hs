@@ -14,6 +14,7 @@ module LCB.Utils
   , improve
   , flatten
   , buildFingerprintTrie
+  , buildTrie
   , prepareFingerprintValues
   ) where
 
@@ -48,6 +49,10 @@ prepareFingerprintValues ((Section _ vls):xs)
    , Just [ds] <- "description" `Prelude.lookup` vls
    = [(f, [PVBS ds]) | f <- fp] ++ prepareFingerprintValues xs
 prepareFingerprintValues (_:xs) = prepareFingerprintValues xs
+
+buildTrie :: [(ByteString, a)] -> T Int a
+buildTrie = Prelude.foldr (\(f,x) t' -> Trie.insert (prepare f) x t') Trie.empty
+  where prepare k = read $ "[" ++ (B8.unpack k) ++ "]" :: [Int]
 
         
 
