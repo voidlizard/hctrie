@@ -43,7 +43,7 @@ generateFiles :: CShow a
               -> [(String, Doc)]
 generateFiles p t v a r ts = 
      [ (prefixed p "radix.c",       generate p v a r)
-     , (prefixed p "radix.h",       generateHeader p)
+     , (prefixed p "radix.h",       generateHeader p r)
      , (prefixed p "radix_tests.c", generateTests p t a r ts)
      ]
 
@@ -68,7 +68,7 @@ generate p v a r = vcat
 	    (align (fillCat $ (map (mkChunk  alphabetSize) v))) -- TODO: use nest
 	 <> semi
      , linebreak
-     , "char*" <+> "results" <> brackets "RESULTS_NUM" <+> "=" <+>
+     , mkType (head r) <+> "results" <> brackets "RESULTS_NUM" <+> "=" <+>
          encloseSep' lbrace rbrace ", " (map cshow r) <> semi
      , linebreak
      , "int" <+> (string $ Text.pack $ prefixed p "radix_trie")
@@ -99,8 +99,8 @@ generate p v a r = vcat
        alphabetSize = length a
 
 
-generateHeader :: String -> Doc
-generateHeader p = vcat
+generateHeader :: CShow a => String -> [a] -> Doc
+generateHeader p r = vcat
     [ "#ifndef" <+> (string $ Text.pack $ prefixed (map toUpper p) "RADIX_TREE_H")
     , "#define" <+> (string $ Text.pack $ prefixed (map toUpper p) "RADIX_TREE_H")
     , "#include" <+> "<stdint.h>"
@@ -111,7 +111,7 @@ generateHeader p = vcat
                        , uint8_t  <+> parens ("*" <> "get_input") <+> parens ("void *") <> semi
                        , "int"    <+> parens ("*" <> "consume_result")
                                   <+> tupled [ "void *"
-                                             , "char *"
+                                             , mkType (head r)
                                              , "int"
                                              , "int" ] <> semi
                       ]) <$> rbrace <+> radix_trie_clb <> "_t" <> semi
@@ -160,7 +160,7 @@ generateTests p t a v inputs = vcat
     , "int" <+> "should_consume[TESTS_SIZE]" <+> "=" <+>
         enclose lbrace rbrace
 	  (align (fillCat (intersperse "," $ map int consumed))) <> semi
-    , "char *" <+> "should_value[TESTS_SIZE]" <+> "=" <+>
+    , mkType (head v) <+> "should_value[TESTS_SIZE]" <+> "=" <+>
         encloseSep' lbrace rbrace ", " (map (\i -> cshow (v!!i)) values) <> semi
     , linebreak
     , "static" <+> "char *" <+> "current_value"   <+> "=" <+> "NULL" <> semi
@@ -257,3 +257,9 @@ encloseSep' left right sep' ds
         []  -> left <> right
 	[d] -> left <> d <> right
 	_   -> align (fillCat (zipWith (<>) (left : repeat sep') ds) <> right)
+
+
+mkType :: CShow a => a -> Doc
+mkType x = case ctype x of
+            [y] -> y
+	    _   -> error "not yet supported"
