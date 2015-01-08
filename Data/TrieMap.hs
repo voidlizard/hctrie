@@ -29,25 +29,24 @@ module Data.TrieMap
 import           Data.List (foldl', nub)
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
 
 -- | Trie like structure.
-data T a b = T b (Map a (T a b)) deriving Show
+data T a b = T (Maybe b) (Map a (T a b)) deriving Show
 
 instance Functor (T a) where fmap = second
 
-insert :: (Ord a, Monoid b) => [a] -> b -> T a b -> T a b
-insert [] v (T _ b) = T v b
+insert :: Ord a => [a] -> b -> T a b -> T a b
+insert []     v (T _ b)  = T (Just v) b
 insert (x:xs) v (T a bs) = T a (Map.alter go x bs)
-  where go Nothing  = Just $ insert xs v (T mempty Map.empty)
+  where go Nothing  = Just $ insert xs v (T Nothing Map.empty)
         go (Just t) = Just $ insert xs v t
 
 -- | Create an one element tree with the specified value in
 -- the root node.
 singleton :: b -> T a b
-singleton v = T v Map.empty
+singleton v = T (Just v) Map.empty
 
 -- | Return all map keys in ascending order.
 keys :: Ord a => T a b -> Set a
@@ -60,10 +59,10 @@ first :: Ord b => (a -> b) -> T a c -> T b c
 first f (T a m) = T a (Map.mapKeys f (Map.map (first f) m))
 
 second :: (b -> c) -> T a b -> T a c
-second f (T a m) = T (f a) (Map.map (second f) m)
+second f (T a m) = T (fmap f a) (Map.map (second f) m)
 
 values :: Ord b => T a b -> Set b
-values (T v m) = Set.insert v $ Set.unions $ Map.elems $ Map.map values m
+values (T v m) = maybe id Set.insert v $ Set.unions $ Map.elems $ Map.map values m
 
 depth :: Ord b => T a b -> Int
 depth (T _ m)

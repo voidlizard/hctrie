@@ -49,6 +49,7 @@ prepareFingerprintValues ((Section _ vls):xs)
    = [(f, [PVBS ds]) | f <- fp] ++ prepareFingerprintValues xs
 prepareFingerprintValues (_:xs) = prepareFingerprintValues xs
 
+        
 
 -- | Recode keys, so they use keys from alphabet
 recode :: (Ord a) => T a b -> (T Int b, [a])
@@ -60,15 +61,14 @@ normalize :: (Ord b) => T a b -> (T a Int, [b])
 normalize t = (Trie.second (\i -> fromJust $ i `elemIndex` m) t, m)
   where m = Set.toList $ Trie.values t
 
-improve :: (Eq b) => b -> T a b -> T a b
-improve zero (T x m)
-  | x == zero = T k m'
-  where m' = Map.map (improve zero) m
+improve :: (Eq b) => T a b -> T a b
+improve (T Nothing m) = T k m'
+  where m' = Map.map improve m
         k  | Map.size m' == 1 = (\(T v _) -> v) $ head $ Map.elems m'
-	   | otherwise        = zero
-improve _ (T v m)  = T v m
+	   | otherwise        = Nothing
+improve (T v m)  = T v m
 
-flatten :: T a b -> [(Int,(b, Map a Int))]
+flatten :: T a b -> [(Int,(Maybe b, Map a Int))]
 flatten = snd . go 0
   where
     go i (T v m) = (i', (i,(v,m')):ls)

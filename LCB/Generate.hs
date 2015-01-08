@@ -36,7 +36,7 @@ prefixed c  x = c ++ '_':x
 
 generateFiles :: String
               -> T Int Int
-              -> [(t, (Int, Map.Map Int Int))]
+              -> [(t, (Maybe Int, Map.Map Int Int))]
               -> [Int]
               -> [B8.ByteString]
               -> [[Int]]
@@ -49,7 +49,7 @@ generateFiles p t v a r ts =
 
 generate :: CShow a
          => String
-         -> [(t, (Int, Map.Map Int Int))]
+         -> [(t, (Maybe Int, Map.Map Int Int))]
          -> [Int]
          -> [a]
          -> Doc
@@ -83,7 +83,7 @@ generate p v a r = vcat
 	 , "int consumed = 0" <> semi
 	 , nest 4 ("do" <+> lbrace <$> do1) <$> rbrace <+> "while (1)" <> semi
 	 , "if (!chunks[i][0]) { return 0; }" <> "// no value is associated with node"
-	 , "cb->consume_result(cc, results[chunks[i][0]], consumed, chunks[i][1])" <> semi
+	 , "cb->consume_result(cc, results[chunks[i][0]-1], consumed, chunks[i][1])" <> semi
 	 ]
        do1   = vcat
 	 [ nest 4 (text "if (!cb->has_more_input(cc))" </> "break" <> semi)
@@ -222,11 +222,11 @@ generateTests p t a v inputs = vcat
 lookupG :: (T Int Int) -> [Int] -> (Int, Int, Int, Int)
 lookupG = go 0 
   where go c (T v m) [] 
-            = (fromEnum (v/=0), fromEnum (Map.null m), c, v)
+            = (fromEnum (isJust v), fromEnum (Map.null m), c, fromMaybe 0 v)
 	go c (T _ m) ((\x -> x `Map.lookup` m -> Just t) :xs)
 	    = go (c+1) t xs
 	go c (T v _) _
-	    = (fromEnum (v/=0), 0, c, v)
+	    = (fromEnum (isJust v), 0, c, fromMaybe 0 v)
 
 
 buildAlphabet :: [Int] -> [Int]
@@ -240,11 +240,12 @@ buildAlphabet = go 0 1
 
 mkChunk :: (Ord k, Num k, Enum k)
         => k
-	-> (t, (Int, Map.Map k Int))
+	-> (t, (Maybe Int, Map.Map k Int))
 	-> Doc
-mkChunk k (_,(i, m)) = encloseSep' lbrace rbrace "," (int i:typ:map int lst) <$$> ","
+mkChunk k (_,(i, m)) = encloseSep' lbrace rbrace "," (int i':typ:map int lst) <$$> ","
   where
     lst = [fromMaybe 0 (Map.lookup j m) | j <- [1..k]]
+    i'  = maybe 0 succ i
     typ 
       | Map.null m = int 1 
       | otherwise  = int 0 
