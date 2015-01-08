@@ -35,26 +35,39 @@ prefixed c  x = c ++ '_':x
 
 generateFiles :: CShow a
               => String
+	      -> String
+	      -> String
               -> T Int Int
               -> [(t, (Maybe Int, Map.Map Int Int))]
               -> [Int]
               -> [a]
               -> [[Int]]
               -> [(String, Doc)]
-generateFiles p t v a r ts = 
-     [ (prefixed p "radix.c",       generate p v a r)
-     , (prefixed p "radix.h",       generateHeader p r)
-     , (prefixed p "radix_tests.c", generateTests p t a r ts)
+generateFiles p structName hdr t v a r ts = 
+     [ (prefixed p "radix.c",       generate p ctp hdr v a r)
+     , (prefixed p "radix.h",       generateHeader p ctp hdr)
+     , (prefixed p "radix_tests.c", generateTests p ctp hdr t a r ts)
      ]
+ where
+   ctp :: Doc
+   ctp = case ctype (head r) of
+           [y] -> y
+	   _  | structName == "" -> error "struct option should be provided"
+	      | otherwise  -> string (Text.pack structName)
 
 generate :: CShow a
          => String
+         -> Doc
+         -> String
          -> [(t, (Maybe Int, Map.Map Int Int))]
          -> [Int]
          -> [a]
          -> Doc
-generate p v a r = vcat 
+generate p ctp hdr v a r = vcat 
      [ "#include" <+> "<stdint.h>"
+     , if hdr == ""
+       then empty
+       else "#include" <+> (string $ Text.pack hdr)
      , "#include" <+> dquotes "radix.h"
      , "#define" <+> "CHUNK_NUM"   <+> int chunksNo
      , "#define" <+> "ALPHABET"    <+> int alphabetSize 
@@ -68,7 +81,7 @@ generate p v a r = vcat
 	    (align (fillCat $ (map (mkChunk  alphabetSize) v))) -- TODO: use nest
 	 <> semi
      , linebreak
-     , mkType (head r) <+> "results" <> brackets "RESULTS_NUM" <+> "=" <+>
+     , ctp <+> "results" <> brackets "RESULTS_NUM" <+> "=" <+>
          encloseSep' lbrace rbrace ", " (map cshow r) <> semi
      , linebreak
      , "int" <+> (string $ Text.pack $ prefixed p "radix_trie")
@@ -83,7 +96,7 @@ generate p v a r = vcat
 	 , "int consumed = 0" <> semi
 	 , nest 4 ("do" <+> lbrace <$> do1) <$> rbrace <+> "while (1)" <> semi
 	 , "if (!chunks[i][0]) { return 0; }" <> "// no value is associated with node"
-	 , "cb->consume_result(cc, results[chunks[i][0]-1], consumed, chunks[i][1])" <> semi
+	 , "cb->consume_result(cc, &results[chunks[i][0]-1], consumed, chunks[i][1])" <> semi
 	 ]
        do1   = vcat
 	 [ nest 4 (text "if (!cb->has_more_input(cc))" </> "break" <> semi)
@@ -99,11 +112,14 @@ generate p v a r = vcat
        alphabetSize = length a
 
 
-generateHeader :: CShow a => String -> [a] -> Doc
-generateHeader p r = vcat
+generateHeader :: String -> Doc -> String -> Doc
+generateHeader p ctp hdr = vcat
     [ "#ifndef" <+> (string $ Text.pack $ prefixed (map toUpper p) "RADIX_TREE_H")
     , "#define" <+> (string $ Text.pack $ prefixed (map toUpper p) "RADIX_TREE_H")
     , "#include" <+> "<stdint.h>"
+    , if hdr == ""
+      then empty
+      else "#include" <+> (string $ Text.pack hdr)
     , linebreak
     , "typedef" <+> "struct" <+> radix_trie_clb <>
         nest 4 (lbrace <$> vcat
@@ -111,7 +127,7 @@ generateHeader p r = vcat
                        , uint8_t  <+> parens ("*" <> "get_input") <+> parens ("void *") <> semi
                        , "int"    <+> parens ("*" <> "consume_result")
                                   <+> tupled [ "void *"
-                                             , mkType (head r)
+                                             , ctp <+> "*"
                                              , "int"
                                              , "int" ] <> semi
                       ]) <$> rbrace <+> radix_trie_clb <> "_t" <> semi
@@ -134,15 +150,20 @@ if_ cls body = "if" <+> parens cls <>
 
 generateTests :: CShow a
               => String
+              -> Doc
+              -> String
               -> T Int Int
               -> [Int]
               -> [a]
               -> [[Int]]
               -> Doc
-generateTests p t a v inputs = vcat
+generateTests p ctp hdr t a v inputs = vcat
     [ "#include <stdint.h>" 
     , "#include <stdlib.h>"
     , "#include <stdio.h>"
+    , if hdr == ""
+      then empty
+      else "#include" <+> (string $ Text.pack hdr)
     , "#include" <+> dquotes (string $ Text.pack $ prefixed p "radix.h")
     , linebreak
     , "#define" <+> "TESTS_SIZE" <+> int (length inputs)
@@ -160,10 +181,10 @@ generateTests p t a v inputs = vcat
     , "int" <+> "should_consume[TESTS_SIZE]" <+> "=" <+>
         enclose lbrace rbrace
 	  (align (fillCat (intersperse "," $ map int consumed))) <> semi
-    , mkType (head v) <+> "should_value[TESTS_SIZE]" <+> "=" <+>
+    , ctp <+> "should_value[TESTS_SIZE]" <+> "=" <+>
         encloseSep' lbrace rbrace ", " (map (\i -> cshow (v!!i)) values) <> semi
     , linebreak
-    , "static" <+> "char *" <+> "current_value"   <+> "=" <+> "NULL" <> semi
+    , "static" <+> ctp <+> "*" <+> "current_value"   <+> "=" <+> "NULL" <> semi
     , "static" <+> "int"    <+> "current_matched"  <+> "=" <+> int 0  <> semi
     , "static" <+> "int"    <+> "current_consumed" <+> "=" <+> int 0  <> semi
     , "static" <+> "int"    <+> "input_idx"        <+> "=" <+> int 0  <> semi
@@ -175,7 +196,7 @@ generateTests p t a v inputs = vcat
         ]
     , function "int" "has_more" ["void * cc"] $ vcat
         [ "return (input_idx <= input_size);" ]
-    , function "int"   "dump_output" [ "void * cc", "char * result", "int consumed", "int exact"] $ vcat
+    , function "int"   "dump_output" [ "void * cc", ctp <+> "* result", "int consumed", "int exact"] $ vcat
         [ "current_value = result" <> semi
 	, "current_matched = exact" <> semi
 	, "current_consumed = consumed" <> semi
@@ -205,8 +226,8 @@ generateTests p t a v inputs = vcat
                         [ "printf(\"%i: [Error: wrong consumed %i, should be %i]\\n\",i,current_consumed,should_consume[i])" <> semi
                         , "continue" <> semi
                         ]
-                    , if_ "strcmp(should_value[i], current_value)" $ vcat
-                        [ "printf(\"%i: [Error: values not match %s, against %s]\\n\",i,current_value,should_value[i])" <> semi
+                    , if_ ("memcmp(&should_value[i], current_value, sizeof(" <> ctp <>"))") $ vcat
+                        [ "printf(\"%i: [Error: values not match]]\\n\",i)" <> semi
                         , "continue" <> semi
                         ]
                     ]
@@ -257,9 +278,3 @@ encloseSep' left right sep' ds
         []  -> left <> right
 	[d] -> left <> d <> right
 	_   -> align (fillCat (zipWith (<>) (left : repeat sep') ds) <> right)
-
-
-mkType :: CShow a => a -> Doc
-mkType x = case ctype x of
-            [y] -> y
-	    _   -> error "not yet supported"

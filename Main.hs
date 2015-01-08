@@ -19,6 +19,7 @@ import Data.Maybe
 import qualified Data.ByteString as B
 import Text.PrettyPrint.Leijen.Text (displayT, renderPretty)
 import qualified Data.Text.Lazy.IO as Text
+import System.Exit
 
 import Language.C.Generate.Parse
 
@@ -26,6 +27,8 @@ import Language.C.Generate.Parse
 data MainOptions = MainOptions
   { moInput  :: String
   , moPrefix :: String
+  , moStructName :: String
+  , moHeader :: String
   -- , moTests  :: Bool
   }
 
@@ -33,6 +36,8 @@ instance Options MainOptions where
   defineOptions = pure MainOptions
     <*> simpleOption "input" "" "input file"
     <*> simpleOption "prefix" "" "prefix in functions and files"
+    <*> simpleOption "struct" "" "structure name"
+    <*> simpleOption "header" "" "additional header"
   --  <*> simpleOption "tests"  True "generate tests"
 
 main = runCommand $ \opts args -> do
@@ -40,6 +45,7 @@ main = runCommand $ \opts args -> do
   eny <- parseCSVLike <$> B.readFile finput
   case eny of
     Left s -> do putStrLn $ "Error reading file: " ++ s
+                 exitFailure
     Right ny -> do
       let y = buildTrie $ map (\(Conf k v) -> (k, v)) ny
       let tests = fullKeys y
@@ -47,6 +53,6 @@ main = runCommand $ \opts args -> do
       let (y'', values)   = normalize y'
       let y'''            = improve y''
       let r               = flatten y'''
-      let xs = generateFiles (moPrefix opts) y''' r alphabet values tests
+      let xs = generateFiles (moPrefix opts) (moStructName opts) (moHeader opts) y''' r alphabet values tests
       forM_ xs $ \(f,p) ->
          Text.writeFile f (displayT (renderPretty 0.6 80 p))
