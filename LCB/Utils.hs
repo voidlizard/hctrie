@@ -8,11 +8,11 @@
 --
 --     * rewrite improve so exposing internal structure will not be needed.
 module LCB.Utils
-  ( buildTrie
-  , recode
+  ( recode
   , normalize
   , improve
   , flatten
+  , buildFingerprintTrie
   ) where
 
 import           LCB.Parse (Section(..), Ini)
@@ -27,8 +27,8 @@ import qualified Data.Set as Set
 import           Data.Map ( Map )
 import qualified Data.Map as Map
 
-buildTrie :: Ini -> T Int ByteString
-buildTrie = go (Trie.singleton "")
+buildFingerprintTrie :: Ini -> T Int ByteString
+buildFingerprintTrie = go (Trie.singleton "")
  where go t [] = t
        go t ((Section hdr vls):xs)
           | Just fp <- "fingerprints" `Prelude.lookup` vls
