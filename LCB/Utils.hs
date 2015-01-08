@@ -37,7 +37,6 @@ buildFingerprintTrie = go (Trie.singleton "")
 	  where prepare k = read $ "[" ++ (B8.unpack k) ++ "]" :: [Int]
        go t (_:xs) = go t xs
 
-
 -- | Recode keys, so they use keys from alphabet
 recode :: (Ord a) => T a b -> (T Int b, [a])
 recode t = (Trie.first (\i -> succ $ fromJust $ i `elemIndex` m) t, m)
@@ -64,3 +63,5 @@ flatten = snd . go 0
         ((i',ls), m') = Map.mapAccumWithKey f (i+1,[]) m
 	f (j,ks) k t = let (j', ks') = go j t
 	               in ((j', ks++ks'), j)
+
+

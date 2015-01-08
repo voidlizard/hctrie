@@ -16,6 +16,8 @@ module LCB.Generate
   , lookupG
   ) where
 
+import Language.C.Generate.Types
+
 import Text.PrettyPrint.Leijen.Text
 import qualified Data.Text.Lazy    as Text
 import Data.Text.Lazy.IO as Text
@@ -58,7 +60,7 @@ generate p v a r = vcat
 	 <> semi
      , linebreak
      , "char*" <+> "results" <> brackets "RESULTS_NUM" <+> "=" <+>
-         encloseSep' lbrace rbrace ", " (map (dquotes.(<>"\\0").pretty.B8.unpack) r) <> semi
+         encloseSep' lbrace rbrace ", " (map cshow r) <> semi
      , linebreak
      , "int" <+> (string $ Text.pack $ prefixed p "radix_trie")
              <> (tupled [ "void"   <+> "*cc"
