@@ -19,6 +19,7 @@ library
                        LCB.Generate
                        Language.C.Generate.Types
                        Language.C.Generate.Parse
+                       Language.C.Generate
   default-extensions:  OverloadedStrings
   -- other-modules:       
   other-extensions:    ExistentialQuantification

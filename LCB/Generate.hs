@@ -16,6 +16,7 @@ module LCB.Generate
   ) where
 
 import Language.C.Generate.Types
+import Language.C.Generate
 
 import Text.PrettyPrint.Leijen.Text
 import qualified Data.Text.Lazy    as Text
@@ -25,9 +26,6 @@ import           Data.List
 import           Data.Maybe
 import qualified Data.Map as Map
 import           Data.TrieMap (T(..))
-
-uint8_t :: Doc
-uint8_t = "uint8_t"
 
 prefixed :: String -> String -> String
 prefixed "" x = x
@@ -68,7 +66,7 @@ generate p ctp hdr v a r = vcat
      , if hdr == ""
        then empty
        else "#include" <+> (string $ Text.pack hdr)
-     , "#include" <+> dquotes "radix.h"
+     , "#include" <+> dquotes (string $ Text.pack $ prefixed p "radix.h")
      , "#define" <+> "CHUNK_NUM"   <+> int chunksNo
      , "#define" <+> "ALPHABET"    <+> int alphabetSize 
      , "#define" <+> "RESULTS_NUM" <+> int resultsSize
@@ -139,14 +137,6 @@ generateHeader p ctp hdr = vcat
     ]
     where
       radix_trie_clb = (string $ Text.pack $ prefixed p "radix_trie_clb") 
-
-function :: Doc -> Doc -> [Doc] -> Doc -> Doc
-function tp name params body = tp <+> name <> tupled params <>
-   nest 4 (lbrace <$> body) <$> rbrace
-
-if_ :: Doc -> Doc -> Doc
-if_ cls body = "if" <+> parens cls <>
-  nest 4 (lbrace <$> body) <$> rbrace
 
 generateTests :: CShow a
               => String
@@ -270,11 +260,3 @@ mkChunk k (_,(i, m)) = encloseSep' lbrace rbrace "," (int i':typ:map int lst) <$
     typ 
       | Map.null m = int 1 
       | otherwise  = int 0 
-
--- Utilities
-encloseSep' :: Doc -> Doc -> Doc -> [Doc] -> Doc
-encloseSep' left right sep' ds
-  = case ds of
-        []  -> left <> right
-	[d] -> left <> d <> right
-	_   -> align (fillCat (zipWith (<>) (left : repeat sep') ds) <> right)
