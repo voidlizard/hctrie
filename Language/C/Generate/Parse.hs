@@ -49,7 +49,7 @@ conf :: Parser [Conf]
 conf = fmap (\(k, v) -> Conf k (parseFields v)) . catMaybes <$> confLine `sepBy` endOfLine
 
 delimeter :: Char
-delimeter = '|'
+delimeter = ','
 
 confLine :: Parser (Maybe ([Word8], [ParseValue]))
 confLine = choice [ pure Nothing <* comment

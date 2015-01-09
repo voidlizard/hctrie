@@ -109,29 +109,33 @@ generate p ctp hdr v a r = vcat
                       ] $ vcat
              [ chunkType <+> "i = 0" <> semi
              , "int consumed = 0" <> semi
+	     , "int may_match = 1" <> semi
              , nest 4 ("do" <+> lbrace <$> do1) <$> rbrace <+> "while (1)" <> semi
 	     , "result:"
              , "if (!chunks[i][0]) { return 0; }" <> "// no value is associated with node"
-             , "cb->consume_result(cc, &results[chunks[i][0]-1], consumed, chunks[i][1] & 1)" <> semi
+             , "cb->consume_result(cc, &results[chunks[i][0]-1], consumed, may_match & chunks[i][1] & 1)" <> semi
              ]
      ]
      where
        do1   = vcat
-                 [ chunkType <+> "next = 0" <> semi
+                 [ "may_match" <+> "=" <+> int 1 <> semi 
+                 , chunkType <+> "next = 0" <> semi
                  , uint8_t <+> "s" <+> "=" <+> int 0 <> semi
                  , "switch(chunks[i][1])" <>
                      block (vcat
                        [ "case 0:"
                        , "case 1:"
-                       , indent 4 $ vcat [next, nextChunk, "++consumed"<>semi, "break;"]
+                       , indent 4 $ vcat [next, nextChunk, "if (next == 0) goto result"<> semi,"++consumed"<>semi, "break;"]
                        , "case 2:"
                        , "case 3:"
                        , indent 4 $ vcat
-                          [ for_ "" "s < chunks[i][2]" "s++" $ vcat 
+                          [ "may_match" <+> "=" <+> int 0 <> semi 
+                          , for_ "" "s < chunks[i][2]" "s++" $ vcat 
                               [ next
                               , if_ "c != chunks[i][3+s]" $ "goto result" <> semi
                               , "++consumed" <> semi
                               ]
+                          , "may_match" <+> "=" <+> int 1 <> semi
                           , "next = chunks[i][3+s]" <> semi
                           ]
                        ])
@@ -160,7 +164,7 @@ generate p ctp hdr v a r = vcat
          | fullAlphabet = uint8_t <+> "c" <+> "=" <+> "cb->get_input(cc)" <> semi
          | otherwise    = vcat 
             [ uint8_t <+> "c" <+> "=" <+> "encode_tbl[cb->get_input(cc)]" <> semi
-            , nest 4 ("if (c == 0)" </> "break" <> semi)
+            , nest 4 ("if (c == 0)" </> "goto result" <> semi)
             ]
        chunkType = findMaxType (length v)
 
