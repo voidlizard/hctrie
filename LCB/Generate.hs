@@ -26,6 +26,9 @@ prefixed :: String -> String -> String
 prefixed "" x = x
 prefixed c  x = c ++ '_':x
 
+alphabetMaxSize :: Int
+alphabetMaxSize = 256
+
 generateFiles :: CShow a
               => String
 	      -> String
@@ -66,8 +69,7 @@ generate p ctp hdr v a r = vcat
      , "#define" <+> "ALPHABET"    <+> int alphabetSize 
      , "#define" <+> "RESULTS_NUM" <+> int resultsSize
      , linebreak
-     , "static" <+> uint8_t <+> "encode_tbl" <> "[]" <+> "=" <+> 
-         encloseSep' lbrace rbrace "," (map int (buildAlphabet a)) <> semi
+     , encodeTbl
      , linebreak
      , "static" <+> "int" <+> "chunks" <> brackets "CHUNK_NUM" <> brackets "ALPHABET+2" <+> "=" <+>
          enclose lbrace rbrace
@@ -93,9 +95,7 @@ generate p ctp hdr v a r = vcat
 	 ]
        do1   = vcat
 	 [ nest 4 (text "if (!cb->has_more_input(cc))" </> "break" <> semi)
-         , uint8_t <+> "c" <+> "=" <+> "encode_tbl[cb->get_input(cc)]" <> semi
-	 , nest 4 ("if (c == 0)" </> "break" <> semi)
-	 , "int next = chunks[i][c+1]" <> semi <+> "// zero is ommited, (not a case in full alphabet)"
+	 , encode
 	 , "if (next == 0) break" <> semi
 	 , "i = next" <> semi
 	 , "++consumed" <> semi
@@ -103,6 +103,21 @@ generate p ctp hdr v a r = vcat
        chunksNo     = length v
        resultsSize  = length r
        alphabetSize = length a
+       fullAlphabet = alphabetSize == alphabetMaxSize
+       encodeTbl
+         | fullAlphabet = empty
+	 | otherwise = "static" <+> uint8_t <+> "encode_tbl" <> "[]" <+> "=" <+> 
+             encloseSep' lbrace rbrace "," (map int (buildAlphabet a)) <> semi
+       encode
+         | fullAlphabet = vcat
+	    [ uint8_t <+> "c" <+> "=" <+> "cb->get_input(cc)" <> semi
+	    , "int next = chunks[i][c]" <> semi <+> "// zero is ommited, (not a case in full alphabet)"
+	    ]
+	 | otherwise    = vcat
+            [ uint8_t <+> "c" <+> "=" <+> "encode_tbl[cb->get_input(cc)]" <> semi
+	    , nest 4 ("if (c == 0)" </> "break" <> semi)
+	    , "int next = chunks[i][c+1]" <> semi <+> "// zero is ommited, (not a case in full alphabet)"
+	    ]
 
 
 generateHeader :: String -> Doc -> String -> Doc
@@ -222,7 +237,9 @@ generateTests p ctp hdr t a v inputs = vcat
     ]
   where
     (results, matched, consumed, values) = unzip4 $ map (lookupG t . recode) inputs
-    recode  = map (\i -> fromJust $ i `elemIndex` ((-1):a))
+    recode
+      | length a == alphabetMaxSize = id
+      | otherwise      = map (\i -> fromJust $ i `elemIndex` ((-1):a))    
 
 
 lookupG :: (T Int Int) -> [Int] -> (Int, Int, Int, Int)
@@ -239,10 +256,10 @@ buildAlphabet :: [Int] -> [Int]
 buildAlphabet = go 0 1
   where
     go c v (x:xs)
-      | c == 256  = []
+      | c == alphabetMaxSize = []
       | c == x    = v:go (c+1) (v+1) xs
       | otherwise = 0:go (c+1) v     (x:xs)
-    go c _ []     = replicate (256-c) 0
+    go c _ []     = replicate (alphabetMaxSize - c) 0
 
 mkChunk :: (Ord k, Num k, Enum k)
         => k
