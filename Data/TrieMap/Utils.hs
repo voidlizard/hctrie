@@ -5,6 +5,7 @@
 --   data that is interesting for us.
 --
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Data.TrieMap.Utils
   ( recode
   , normalize
@@ -13,11 +14,17 @@ module Data.TrieMap.Utils
   , flattenPack
   , buildTrie
   , Chunked
+  , pack
+  , promote
+  -- Packed value
+  , Packed(..)
+  , packedValue
   ) where
 
 import           Data.TrieMap (T(..))
 import qualified Data.TrieMap as Trie
 
+import           Control.Applicative
 import           Data.List
 import           Data.Maybe
 import qualified Data.Set as Set
@@ -37,6 +44,52 @@ recode t = (Trie.first (\i -> succ $ fromJust $ i `elemIndex` m) t, m)
 normalize :: (Ord b) => T a b -> (T a Int, [b])
 normalize t = (Trie.second (\i -> fromJust $ i `elemIndex` m) t, m)
   where m = Set.toList $ Trie.values t
+
+{- If no values is assossiated with node and no path is compressed then
+ - Nothing is stored in node, otherwise there is a packed value, 
+ - when we are combining nodes we should care that we don't compress
+ - nodes with different values inside them!
+ -}
+
+data Packed a b
+      = Packed [a] (Maybe b)
+      | NonPacked b
+      deriving (Eq, Show)
+ 
+instance Functor (Packed a) where
+  fmap f (NonPacked b) = NonPacked (f b)
+  fmap f (Packed a b)  = Packed a (fmap f b)
+
+packedValue :: Packed a b -> Maybe b
+packedValue (NonPacked b) = Just b
+packedValue (Packed _  b) = b
+
+appendPath :: Maybe (Packed a b) -> a -> Maybe (Packed a b)
+appendPath Nothing a              = Just $ Packed [a] Nothing
+appendPath (Just (NonPacked v)) a = Just $ Packed [a] (Just v)
+appendPath (Just (Packed b v))  a = Just $ Packed (b++[a]) v
+
+pack :: (Eq a, Eq b) => T a b -> T a (Packed a b)
+pack (T v m) = loop (fmap NonPacked v) m
+  where
+    loop w m'
+      | [(k, T w' m'')] <- Map.toList m' 
+      , (w >>= packedValue) == w' = loop (w `appendPath` k) m''
+    loop w m' = T w (Map.map pack m')
+
+promote :: forall a b . T a (Packed a b) -> T a (Packed a (Either b b))
+promote (T (Just v@(NonPacked _)) m)       = T (Just (fmap Right v)) (Map.map promote m)
+promote (T (Just v@(Packed _ (Just _))) m) = T (Just (fmap Right v)) (Map.map promote m)
+promote (T v m)  = T (f v closest) m'
+  where
+    m' = Map.map promote m
+    closest :: Maybe b
+    closest = fmap (either id id) $ Map.foldl (\mx (T l _) -> mx <|> (l >>= packedValue)) Nothing m'
+    f :: Maybe (Packed a b) -> Maybe b -> Maybe (Packed a (Either b b))
+    f Nothing w                   = fmap (NonPacked . Left) w
+    f (Just (Packed l Nothing)) w = Just (Packed l (fmap Left w))
+    f _ _ = error "impossible happened"
+
 
 improve :: (Eq b) => T a b -> T a b
 improve (T Nothing m) = T k m'
@@ -62,7 +115,7 @@ flattenPack sz = snd . go 0
      go i (T v m) = (i', (i, (v, m')):ls)
         where
           ((i',ls), m')
-            | Map.size m == 1 =
+            | Map.size m == 1 && sz > 3 =
                 let (j, p, z) = go2 i $ head $ Map.toList m
                 in ((j, z), Left p)
             | otherwise       = fmap Right $ Map.mapAccumWithKey f (i+1,[]) m
@@ -74,6 +127,6 @@ flattenPack sz = snd . go 0
            | Map.size m == 1 = let (i', (next,l), z) = go2 i $ head $ Map.toList m
                                in if length l < sz-2
                                   then (i', (next,k:l), z)
-                                  else  (i'+1, (Just i', [k]), (i', (v,  Left (next, l))):z)
-           | otherwise       = let (i', z) = go (i+1) t
-	                       in (i', (Just (i+1), [k]), z)
+                                  else  (i'+1, (Just (i'+1), [k]), (i', (v,  Left (next, l))):z)
+           | otherwise       = let (i', z) = go i t
+	                       in (i'+1, (Just (i'+1), [k]), z)

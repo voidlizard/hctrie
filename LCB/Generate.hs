@@ -3,25 +3,36 @@
 --
 --  XXX: Support total alphabet
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TupleSections #-}
 module LCB.Generate
   ( generate 
   , generateTests
   , generateFiles
   , lookupG
+  , convertTrie
+  , numerate
+  , normalizeValues
+  , prepareNode
   ) where
 
 import Language.C.Generate.Types
 import Language.C.Generate
+import           Data.TrieMap (T(..))
+import           Data.TrieMap.Utils hiding (recode)
 
 import Text.PrettyPrint.Leijen.Text
 import qualified Data.Text.Lazy    as Text
 import Data.Char
 
-import           Data.List
+import qualified Control.Applicative as A
+import           Data.Foldable hiding (for_)
+import           Data.Traversable
+import           Data.List hiding (mapAccumL)
 import           Data.Maybe
+import qualified Data.Monoid as M
+import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.TrieMap (T(..))
-import           Data.TrieMap.Utils (Chunked)
+import qualified Data.Set as Set
 
 prefixed :: String -> String -> String
 prefixed "" x = x
@@ -29,6 +40,82 @@ prefixed c  x = c ++ '_':x
 
 alphabetMaxSize :: Int
 alphabetMaxSize = 256
+
+data Node a b
+   = Node { nodeValue      :: b
+--          , nodeIsTerminal :: Bool
+          , nodeData       :: NodeData a b
+          }
+   deriving (Show)
+
+instance Functor (Node a) where
+  fmap f (Node v d) = Node (f v) (fmap f d)
+
+
+instance Foldable (Node a) where
+  foldMap f (Node v d) = f v M.<> foldMap f d
+ 
+instance Traversable (Node a) where
+  traverse f (Node v d) = Node A.<$> f v
+                               A.<*> traverse f d
+  
+data NodeData a b
+   = NodeSwitch { _nodeLinks  :: Map a (Node a b) }
+   | NodeChunk  { _nodeValues :: [a]
+                , _nodeNext   :: Maybe (Node a b)
+                }
+   deriving (Show)
+
+instance Functor (NodeData a) where
+  fmap f (NodeSwitch m)  = NodeSwitch (Map.map (fmap f) m)
+  fmap f (NodeChunk a m) = NodeChunk a (fmap (fmap f) m)
+
+instance Foldable (NodeData a) where
+  foldMap f (NodeSwitch m)         = M.mconcat $ map (foldMap f) $ Map.elems m
+  foldMap _ (NodeChunk _ Nothing)  = M.mempty
+  foldMap f (NodeChunk _ (Just x)) = foldMap f x
+
+instance Traversable (NodeData a) where
+  traverse f (NodeSwitch m)         = NodeSwitch A.<$> traverse (traverse f) m
+  traverse _ (NodeChunk a Nothing)  = A.pure (NodeChunk a Nothing)
+  traverse f (NodeChunk a (Just x)) = NodeChunk a . Just A.<$> traverse f x
+
+
+convertTrie :: T a (Packed a (Either b b)) -> Node a (Bool, Maybe b)
+convertTrie (T Nothing m) = Node (False, Nothing) (NodeSwitch (Map.map convertTrie m))
+convertTrie (T (Just v) m) = case v of
+    Packed ls _ -> n $ NodeChunk ls next
+    NonPacked _ -> n $ NodeSwitch (Map.map convertTrie m)
+  where
+    n d = Node { nodeValue = maybe (False, Nothing) (\(f,k) -> (f, Just k))
+                           $ fmap (either (False,) (True,)) (packedValue v)
+               , nodeData = d
+               }
+    next
+      | Map.null m = Nothing
+      | otherwise  = Just $ n $ NodeSwitch (Map.map convertTrie m)
+
+numerate :: Node a b -> Node a (Int, b)
+numerate = snd . mapAccumL (\c b -> (succ c,(c,b))) 0 
+
+normalizeValues :: Ord b => Node a (Bool, Maybe b) -> ([b], Node a (Bool, Maybe Int))
+normalizeValues n = (l, n')
+  where (s, n') = mapAccumL (\z b -> ( maybe s (flip Set.insert z) (snd b)
+                                     , fmap (\x -> (`elemIndex` l) =<< x) b)) Set.empty n
+        l = Set.toList s
+
+prepareNode :: Int -> Node Int (Int, (Bool, b)) -> Node Int Doc
+prepareNode sz (Node (v,(t,_)) d) = Node (encloseSep' lbrace rbrace "," (cshow v:int (toNodeType t d):go d))
+                                         (node d)
+  where toNodeType :: Bool -> NodeData a b -> Int
+        toNodeType False NodeSwitch{} = 0
+        toNodeType True  NodeSwitch{} = 1
+        toNodeType False NodeChunk{}  = 2
+        toNodeType True  NodeChunk{}  = 3
+        go (NodeSwitch m) = [maybe (int 0) (\(Node (w,_) _) -> int w) $ i `Map.lookup` m | i  <- [0..sz]]
+        go (NodeChunk l n) = int (length l):map int l ++ [maybe "0" (\(Node (w,_) _) -> int w) n]
+	node (NodeSwitch m)  = NodeSwitch $ Map.map (prepareNode sz) m
+        node (NodeChunk l m) = NodeChunk l $ fmap (prepareNode sz) m
 
 generateFiles :: CShow a
               => String
@@ -51,29 +138,6 @@ generateFiles p structName hdr t v a r ts =
            [y] -> y
            _  | structName == "" -> error "struct option should be provided"
               | otherwise  -> string (Text.pack structName)
-{-
- -
-        if (c == 0) break;
-	uint8_t next = 0;
-	switch (chunks[i][1]) {
-		case 0:
-		case 1:
-                	uint8_t next = chunks[i][c+1]; // zero is ommited, (not a case in full alphabet)
-			break;
-		case 2:
-		case 3:
-			uint8_t s = 0;
-			for (s=0; s<chunks[i][3]; s++) {
-				if (!cb->has_more_input(cc) goto result;
-				c = encode_tbl[ch->get_input(cc)];
-				if (c == 0) goto result;
-				if (c == chunks[i][s+3])
-				   goto result;
-				++consumed;
-			}
-			next = chunks[i][s+3];
-	}
-	-}
 
 generate :: CShow a
          => String

@@ -49,3 +49,6 @@ main = runCommand $ \opts args -> do
       let xs = generateFiles (moPrefix opts) (moStructName opts) (moHeader opts) y''' r alphabet values tests
       forM_ xs $ \(f,p) ->
          Text.writeFile f (displayT (renderPretty 0.6 80 p))
+
+second :: (b -> c) -> (a,b) ->(a,c)
+second f (a,b) = (a, f b)
