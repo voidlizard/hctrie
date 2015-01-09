@@ -24,7 +24,6 @@ data MainOptions = MainOptions
   , moPrefix :: String
   , moStructName :: String
   , moHeader :: String
-  -- , moTests  :: Bool
   }
 
 instance Options MainOptions where
@@ -33,7 +32,6 @@ instance Options MainOptions where
     <*> simpleOption "prefix" "" "prefix in functions and files"
     <*> simpleOption "struct" "" "structure name"
     <*> simpleOption "header" "" "additional header"
-  --  <*> simpleOption "tests"  True "generate tests"
 
 main = runCommand $ \opts args -> do
   let finput = moInput opts
