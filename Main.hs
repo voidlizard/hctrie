@@ -45,7 +45,7 @@ main = runCommand $ \opts args -> do
       let (y', alphabet)  = recode y
       let (y'', values)   = normalize y'
       let y'''            = improve y''
-      let r               = flattenPack y'''
+      let r               = flattenPack (length alphabet) y'''
       let xs = generateFiles (moPrefix opts) (moStructName opts) (moHeader opts) y''' r alphabet values tests
       forM_ xs $ \(f,p) ->
          Text.writeFile f (displayT (renderPretty 0.6 80 p))

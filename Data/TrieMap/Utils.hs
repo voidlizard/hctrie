@@ -56,8 +56,8 @@ flatten = snd . go 0
 
 type Chunked a = Either (Maybe Int, [a]) (Map a Int)
 
-flattenPack :: T a b -> [(Int, (Maybe b, Chunked a))]
-flattenPack = snd . go 0
+flattenPack :: Int -> T a b -> [(Int, (Maybe b, Chunked a))]
+flattenPack sz = snd . go 0
    where
      go i (T v m) = (i', (i, (v, m')):ls)
         where
@@ -69,9 +69,11 @@ flattenPack = snd . go 0
           f (j,ks) _ t  = let (j', ks') = go j t
                           in ((j', ks++ks'), j)
      go2 :: Int -> (a, T a b) -> (Int, (Maybe Int, [a]), [(Int, (Maybe b, Chunked a))])
-     go2 i (k, t@(T _ m))
+     go2 i (k, t@(T v m))
            | Map.size m == 0 = (i, (Nothing, [k]), [])
            | Map.size m == 1 = let (i', (next,l), z) = go2 i $ head $ Map.toList m
-                               in (i', (next,k:l), z)
+                               in if length l < sz-2
+                                  then (i', (next,k:l), z)
+                                  else  (i'+1, (Just i', [k]), (i', (v,  Left (next, l))):z)
            | otherwise       = let (i', z) = go (i+1) t
 	                       in (i', (Just (i+1), [k]), z)
