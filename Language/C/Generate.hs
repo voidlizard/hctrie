@@ -6,15 +6,30 @@ module Language.C.Generate
     function
   , if_
     -- * types
-  ,  uint8_t
+  , uint8_t
+  , uint16_t
+  , uint32_t
+  , uint64_t
     -- * missing functions
   , encloseSep'
+  , findMaxType
   ) where
 
 import Text.PrettyPrint.Leijen.Text
 
+import Data.Word
+
 uint8_t :: Doc
 uint8_t = "uint8_t"
+
+uint16_t :: Doc
+uint16_t = "uint16_t"
+
+uint32_t :: Doc
+uint32_t = "uint32_t"
+
+uint64_t :: Doc
+uint64_t = "uint64_t"
 
 function :: Doc -> Doc -> [Doc] -> Doc -> Doc
 function tp name params body = tp <+> name <> tupled params <>
@@ -31,3 +46,10 @@ encloseSep' left right sep' ds
         []  -> left <> right
 	[d] -> left <> d <> right
 	_   -> align (fillCat (zipWith (<>) (left : repeat sep') ds) <> right)
+
+findMaxType :: Int -> Doc
+findMaxType x
+  | x <= fromIntegral (maxBound ::Word8)  = uint8_t
+  | x <= fromIntegral (maxBound ::Word16) = uint16_t
+  | x <= fromIntegral (maxBound ::Word32) = uint32_t
+  | otherwise                             = uint64_t

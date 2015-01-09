@@ -48,8 +48,8 @@ generateFiles p structName hdr t v a r ts =
    ctp :: Doc
    ctp = case ctype (head r) of
            [y] -> y
-	   _  | structName == "" -> error "struct option should be provided"
-	      | otherwise  -> string (Text.pack structName)
+           _  | structName == "" -> error "struct option should be provided"
+              | otherwise  -> string (Text.pack structName)
 
 generate :: CShow a
          => String
@@ -71,53 +71,52 @@ generate p ctp hdr v a r = vcat
      , linebreak
      , encodeTbl
      , linebreak
-     , "static" <+> "int" <+> "chunks" <> brackets "CHUNK_NUM" <> brackets "ALPHABET+2" <+> "=" <+>
+     , "static" <+> chunkType <+> "chunks" <> brackets "CHUNK_NUM" <> brackets "ALPHABET+2" <+> "=" <+>
          enclose lbrace rbrace
-	    (align (fillCat $ (map (mkChunk  alphabetSize) v))) -- TODO: use nest
-	 <> semi
+           (align (fillCat $ (map (mkChunk  alphabetSize) v))) -- TODO: use nest
+           <> semi
      , linebreak
      , ctp <+> "results" <> brackets "RESULTS_NUM" <+> "=" <+>
          encloseSep' lbrace rbrace ", " (map cshow r) <> semi
      , linebreak
-     , "int" <+> (string $ Text.pack $ prefixed p "radix_trie")
-             <> (tupled [ "void"   <+> "*cc"
-                        , (string $ Text.pack $ prefixed p "radix_trie_clb_t") <+> "*cb"
-                        ]
-              ) <> (nest 4 (lbrace <$> inner) <$> rbrace)
+     , function "int" (string $ Text.pack $ prefixed p "radix_trie")
+                      [ "void"   <+> "*cc"
+                      , (string $ Text.pack $ prefixed p "radix_trie_clb_t") <+> "*cb"
+                      ] $ vcat
+             [ chunkType <+> "i = 0" <> semi
+             , "int consumed = 0" <> semi
+             , nest 4 ("do" <+> lbrace <$> do1) <$> rbrace <+> "while (1)" <> semi
+             , "if (!chunks[i][0]) { return 0; }" <> "// no value is associated with node"
+             , "cb->consume_result(cc, &results[chunks[i][0]-1], consumed, chunks[i][1])" <> semi
+             ]
      ]
      where
-       inner = vcat 
-	 [ "int i = 0" <> semi
-	 , "int consumed = 0" <> semi
-	 , nest 4 ("do" <+> lbrace <$> do1) <$> rbrace <+> "while (1)" <> semi
-	 , "if (!chunks[i][0]) { return 0; }" <> "// no value is associated with node"
-	 , "cb->consume_result(cc, &results[chunks[i][0]-1], consumed, chunks[i][1])" <> semi
-	 ]
        do1   = vcat
-	 [ nest 4 (text "if (!cb->has_more_input(cc))" </> "break" <> semi)
-	 , encode
-	 , "if (next == 0) break" <> semi
-	 , "i = next" <> semi
-	 , "++consumed" <> semi
-	 ]
+                 [ nest 4 (text "if (!cb->has_more_input(cc))" </> "break" <> semi)
+                 , encode
+                 , "if (next == 0) break" <> semi
+                 , "i = next" <> semi
+                 , "++consumed" <> semi
+                 ]
        chunksNo     = length v
        resultsSize  = length r
        alphabetSize = length a
        fullAlphabet = alphabetSize == alphabetMaxSize
        encodeTbl
          | fullAlphabet = empty
-	 | otherwise = "static" <+> uint8_t <+> "encode_tbl" <> "[]" <+> "=" <+> 
+         | otherwise = "static" <+> uint8_t <+> "encode_tbl" <> "[]" <+> "=" <+> 
              encloseSep' lbrace rbrace "," (map int (buildAlphabet a)) <> semi
        encode
          | fullAlphabet = vcat
-	    [ uint8_t <+> "c" <+> "=" <+> "cb->get_input(cc)" <> semi
-	    , "int next = chunks[i][c]" <> semi <+> "// zero is ommited, (not a case in full alphabet)"
-	    ]
-	 | otherwise    = vcat
+             [ uint8_t <+> "c" <+> "=" <+> "cb->get_input(cc)" <> semi
+             , chunkType <+> "next = chunks[i][c]" <> semi <+> "// zero is ommited, (not a case in full alphabet)"
+             ]
+         | otherwise    = vcat
             [ uint8_t <+> "c" <+> "=" <+> "encode_tbl[cb->get_input(cc)]" <> semi
-	    , nest 4 ("if (c == 0)" </> "break" <> semi)
-	    , "int next = chunks[i][c+1]" <> semi <+> "// zero is ommited, (not a case in full alphabet)"
-	    ]
+            , nest 4 ("if (c == 0)" </> "break" <> semi)
+            , chunkType <+> "next = chunks[i][c+1]" <> semi <+> "// zero is ommited, (not a case in full alphabet)"
+            ]
+       chunkType = findMaxType (length v)
 
 
 generateHeader :: String -> Doc -> String -> Doc
