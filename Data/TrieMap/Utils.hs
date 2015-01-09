@@ -10,7 +10,9 @@ module Data.TrieMap.Utils
   , normalize
   , improve
   , flatten
+  , flattenPack
   , buildTrie
+  , Chunked
   ) where
 
 import           Data.TrieMap (T(..))
@@ -40,7 +42,7 @@ improve :: (Eq b) => T a b -> T a b
 improve (T Nothing m) = T k m'
   where m' = Map.map improve m
         k  | Map.size m' == 1 = (\(T v _) -> v) $ head $ Map.elems m'
-	   | otherwise        = Nothing
+           | otherwise        = Nothing
 improve (T v m)  = T v m
 
 flatten :: T a b -> [(Int,(Maybe b, Map a Int))]
@@ -49,5 +51,27 @@ flatten = snd . go 0
     go i (T v m) = (i', (i,(v,m')):ls)   -- XXX: rewrite improve so exposing internal structure will not be needed.
       where
         ((i',ls), m') = Map.mapAccumWithKey f (i+1,[]) m
-	f (j,ks) _ t = let (j', ks') = go j t
-	               in ((j', ks++ks'), j)
+        f (j,ks) _ t = let (j', ks') = go j t
+                       in ((j', ks++ks'), j)
+
+type Chunked a = Either (Maybe Int, [a]) (Map a Int)
+
+flattenPack :: T a b -> [(Int, (Maybe b, Chunked a))]
+flattenPack = snd . go 0
+   where
+     go i (T v m) = (i', (i, (v, m')):ls)
+        where
+          ((i',ls), m')
+            | Map.size m == 1 =
+                let (j, p, z) = go2 i $ head $ Map.toList m
+                in ((j, z), Left p)
+            | otherwise       = fmap Right $ Map.mapAccumWithKey f (i+1,[]) m
+          f (j,ks) _ t  = let (j', ks') = go j t
+                          in ((j', ks++ks'), j)
+     go2 :: Int -> (a, T a b) -> (Int, (Maybe Int, [a]), [(Int, (Maybe b, Chunked a))])
+     go2 i (k, t@(T _ m))
+           | Map.size m == 0 = (i, (Nothing, [k]), [])
+           | Map.size m == 1 = let (i', (next,l), z) = go2 i $ head $ Map.toList m
+                               in (i', (next,k:l), z)
+           | otherwise       = let (i', z) = go (i+1) t
+	                       in (i', (Just (i+1), [k]), z)

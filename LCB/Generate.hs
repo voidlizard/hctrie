@@ -21,6 +21,7 @@ import           Data.List
 import           Data.Maybe
 import qualified Data.Map as Map
 import           Data.TrieMap (T(..))
+import           Data.TrieMap.Utils (Chunked)
 
 prefixed :: String -> String -> String
 prefixed "" x = x
@@ -34,7 +35,7 @@ generateFiles :: CShow a
 	      -> String
 	      -> String
               -> T Int Int
-              -> [(t, (Maybe Int, Map.Map Int Int))]
+              -> [(t, (Maybe Int, Chunked Int))]
               -> [Int]
               -> [a]
               -> [[Int]]
@@ -50,12 +51,35 @@ generateFiles p structName hdr t v a r ts =
            [y] -> y
            _  | structName == "" -> error "struct option should be provided"
               | otherwise  -> string (Text.pack structName)
+{-
+ -
+        if (c == 0) break;
+	uint8_t next = 0;
+	switch (chunks[i][1]) {
+		case 0:
+		case 1:
+                	uint8_t next = chunks[i][c+1]; // zero is ommited, (not a case in full alphabet)
+			break;
+		case 2:
+		case 3:
+			uint8_t s = 0;
+			for (s=0; s<chunks[i][3]; s++) {
+				if (!cb->has_more_input(cc) goto result;
+				c = encode_tbl[ch->get_input(cc)];
+				if (c == 0) goto result;
+				if (c == chunks[i][s+3])
+				   goto result;
+				++consumed;
+			}
+			next = chunks[i][s+3];
+	}
+	-}
 
 generate :: CShow a
          => String
          -> Doc
          -> String
-         -> [(t, (Maybe Int, Map.Map Int Int))]
+         -> [(t, (Maybe Int, Chunked Int))]
          -> [Int]
          -> [a]
          -> Doc
@@ -86,17 +110,33 @@ generate p ctp hdr v a r = vcat
              [ chunkType <+> "i = 0" <> semi
              , "int consumed = 0" <> semi
              , nest 4 ("do" <+> lbrace <$> do1) <$> rbrace <+> "while (1)" <> semi
+	     , "result:"
              , "if (!chunks[i][0]) { return 0; }" <> "// no value is associated with node"
-             , "cb->consume_result(cc, &results[chunks[i][0]-1], consumed, chunks[i][1])" <> semi
+             , "cb->consume_result(cc, &results[chunks[i][0]-1], consumed, chunks[i][1] & 1)" <> semi
              ]
      ]
      where
        do1   = vcat
-                 [ nest 4 (text "if (!cb->has_more_input(cc))" </> "break" <> semi)
-                 , encode
+                 [ chunkType <+> "next = 0" <> semi
+                 , uint8_t <+> "s" <+> "=" <+> int 0 <> semi
+                 , "switch(chunks[i][1])" <>
+                     block (vcat
+                       [ "case 0:"
+                       , "case 1:"
+                       , indent 4 $ vcat [next, nextChunk, "++consumed"<>semi, "break;"]
+                       , "case 2:"
+                       , "case 3:"
+                       , indent 4 $ vcat
+                          [ for_ "" "s < chunks[i][2]" "s++" $ vcat 
+                              [ next
+                              , if_ "c != chunks[i][3+s]" $ "goto result" <> semi
+                              , "++consumed" <> semi
+                              ]
+                          , "next = chunks[i][3+s]" <> semi
+                          ]
+                       ])
                  , "if (next == 0) break" <> semi
                  , "i = next" <> semi
-                 , "++consumed" <> semi
                  ]
        chunksNo     = length v
        resultsSize  = length r
@@ -106,15 +146,21 @@ generate p ctp hdr v a r = vcat
          | fullAlphabet = empty
          | otherwise = "static" <+> uint8_t <+> "encode_tbl" <> "[]" <+> "=" <+> 
              encloseSep' lbrace rbrace "," (map int (buildAlphabet a)) <> semi
+       nextChunk :: Doc
+       nextChunk
+         | fullAlphabet = "next = chunks[i][c]" <> semi
+	 | otherwise    = "next = chunks[i][c+1]" <> semi
+       next :: Doc
+       next = vcat
+         [ "if" <+> parens ("!" <> "cb->has_more_input" <> parens ("cc")) </> "goto result;"
+         , encode
+         ]
+       encode :: Doc
        encode
-         | fullAlphabet = vcat
-             [ uint8_t <+> "c" <+> "=" <+> "cb->get_input(cc)" <> semi
-             , chunkType <+> "next = chunks[i][c]" <> semi <+> "// zero is ommited, (not a case in full alphabet)"
-             ]
-         | otherwise    = vcat
+         | fullAlphabet = uint8_t <+> "c" <+> "=" <+> "cb->get_input(cc)" <> semi
+         | otherwise    = vcat 
             [ uint8_t <+> "c" <+> "=" <+> "encode_tbl[cb->get_input(cc)]" <> semi
             , nest 4 ("if (c == 0)" </> "break" <> semi)
-            , chunkType <+> "next = chunks[i][c+1]" <> semi <+> "// zero is ommited, (not a case in full alphabet)"
             ]
        chunkType = findMaxType (length v)
 
@@ -260,14 +306,28 @@ buildAlphabet = go 0 1
       | otherwise = 0:go (c+1) v     (x:xs)
     go c _ []     = replicate (alphabetMaxSize - c) 0
 
-mkChunk :: (Ord k, Num k, Enum k)
-        => k
-	-> (t, (Maybe Int, Map.Map k Int))
-	-> Doc
-mkChunk k (_,(i, m)) = encloseSep' lbrace rbrace "," (int i':typ:map int lst) <$$> ","
+commonChunk, terminalChunk, listChunk, listTerminalChunk :: Doc
+commonChunk       = int 0
+terminalChunk     = int 1
+listChunk         = int 2
+listTerminalChunk = int 3
+
+mkChunk :: Int
+        -> (t, (Maybe Int, Chunked Int))
+        -> Doc
+mkChunk k (_,(i, Left (mnext, lst))) = encloseSep' lbrace rbrace "," (int i':typ:sz:map int lst') <$$> ","
+  where
+    i'   = maybe 0 succ i
+    next = maybe 0 id mnext
+    lst' = take (k-1) $ lst ++ next:repeat 0
+    sz = int (length lst)
+    typ 
+      | isNothing mnext = listTerminalChunk 
+      | otherwise       = listChunk
+mkChunk k (_,(i, Right m)) = encloseSep' lbrace rbrace "," (int i':typ:map int lst) <$$> ","
   where
     lst = [fromMaybe 0 (Map.lookup j m) | j <- [1..k]]
     i'  = maybe 0 succ i
     typ 
-      | Map.null m = int 1 
-      | otherwise  = int 0 
+      | Map.null m = terminalChunk 
+      | otherwise  = commonChunk 

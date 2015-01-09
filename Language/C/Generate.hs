@@ -5,6 +5,8 @@ module Language.C.Generate
   ( -- * structure helpers
     function
   , if_
+  , for_
+  , block
     -- * types
   , uint8_t
   , uint16_t
@@ -38,6 +40,13 @@ function tp name params body = tp <+> name <> tupled params <>
 if_ :: Doc -> Doc -> Doc
 if_ cls body = "if" <+> parens cls <>
   nest 4 (lbrace <$> body) <$> rbrace
+
+for_ :: Doc -> Doc -> Doc -> Doc -> Doc
+for_ from to by body = "for" <+> parens ( from <> semi <+> to <> semi <+> by) <>
+  nest 4 (lbrace <$> body) <$> rbrace
+
+block :: Doc -> Doc
+block body = nest 4 (lbrace <$> body) <$> rbrace
 
 -- Utilities
 encloseSep' :: Doc -> Doc -> Doc -> [Doc] -> Doc
