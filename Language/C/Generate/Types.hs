@@ -27,7 +27,7 @@ class CShow a where
   ctype :: a -> [Doc]
 
 instance CShow ByteString where
-  cshow = dquotes . (<> "\\0") . pretty . B8.unpack
+  cshow = dquotes . pretty . B8.unpack
   ctype _ = ["char *"]
   
 instance CShow Int where
