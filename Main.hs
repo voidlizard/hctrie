@@ -22,22 +22,22 @@ import Language.C.Generate.Parse
 
 
 data MainOptions = MainOptions
-  { moInput  :: String
-  , moPrefix :: String
+  { moPrefix :: String
   , moStructName :: String
   , moHeader :: String 
   }
 
 instance Options MainOptions where
   defineOptions = pure MainOptions
-    <*> simpleOption "input" "" "input file"
     <*> simpleOption "prefix" "" "prefix in functions and files"
     <*> simpleOption "struct" "" "structure name"
     <*> simpleOption "headers" "" "additional header, comma separated list"
 
 main = runCommand $ \opts args -> do
-  let finput = moInput opts
-  eny <- parseCSVLike <$> B.readFile finput
+  input <- case args of
+             [] -> B.getContents
+             xs -> B.concat <$> mapM B.readFile xs
+  let eny = parseCSVLike input
   case eny of
     Left s -> do putStrLn $ "Error reading file: " ++ s
                  exitFailure
