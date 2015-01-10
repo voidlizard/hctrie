@@ -15,6 +15,7 @@ module LCB.Generate
   , prepareNode
   ) where
 
+import           Prelude hiding (all)
 import Language.C.Generate.Types
 import Language.C.Generate
 import           Data.TrieMap (T(..))
@@ -27,7 +28,7 @@ import qualified Data.Text.Lazy    as Text
 import qualified Control.Applicative as A
 import           Data.Foldable hiding (for_)
 import           Data.Traversable
-import           Data.List hiding (mapAccumL)
+import           Data.List hiding (mapAccumL, all)
 import           Data.Maybe
 import qualified Data.Monoid as M
 import           Data.Map (Map)
@@ -126,11 +127,13 @@ generateFiles :: (CShow a, Ord a, Show a)
               -> T Int (Packed Int (Either a a))
               -> [([Int],(Maybe a,Bool,Int))]
               -> [Either Text (Text, Doc)]
-generateFiles p structName genTests hdr alphabet t tests = map Right $
+generateFiles p structName genTests hdr alphabet t tests = (map Right 
     [ (prefixed p "radix.c", generateFile)
     , (headerFileName,       generateHeader)
-    ] ++ (if genTests
-          then [(prefixed p "radix_tests.c", generateTests)]
+    ]) ++ (if genTests
+          then if canGenTests
+               then [Left  "Warning: tests files were not generated, tests interface for 'char *' is not supported"]
+               else [Right (prefixed p "radix_tests.c", generateTests)]
           else [])
  where
    headerFileName = prefixed p "radix.h"
@@ -148,9 +151,11 @@ generateFiles p structName genTests hdr alphabet t tests = map Right $
    chunkType = findMaxType (length chunksList)
    alphabetSize = length alphabet
    fullAlphabet = alphabetSize == alphabetMaxSize
+   canGenTests :: Bool
+   canGenTests = all (/="char *") $ ctype (head values)
    ctp :: Doc
    ctp = case ctype (head values) of
-           [y] -> y
+           [y] -> string $ Text.pack y
            _  | structName == "" -> error "struct option should be provided"
               | otherwise  -> string structName
    -- Pretty

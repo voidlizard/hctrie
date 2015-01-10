@@ -24,7 +24,7 @@ class CShow a where
   default cshow :: Pretty a => a -> Doc
   cshow = pretty
   -- | Shows type of the corresponding C value
-  ctype :: a -> [Doc]
+  ctype :: a -> [String]
 
 instance CShow ByteString where
   cshow = dquotes . pretty . B8.unpack
