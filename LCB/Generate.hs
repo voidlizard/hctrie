@@ -132,7 +132,7 @@ generateFiles p structName hdr alphabet t tests =
     ]
  where
    headerFileName = prefixed p "radix.h"
-   radixTrie    = string $ prefixed p "radix_trie"
+   radixTrie    = string $ prefixed p "radix_trie_lookup"
    radixTrieClb = string $ prefixed p "radix_trie_clb"
 
    -- Tree
@@ -163,7 +163,7 @@ generateFiles p structName hdr alphabet t tests =
      , encodeTbl
      , chunks
      , results
-     , function "int" radixTrie
+     , function "void *" radixTrie
                       [ "void"   <+> "*cc"
                       , radixTrieClb <> "_t" <+> "*cb"
                       ] $ vcat
@@ -199,7 +199,7 @@ generateFiles p structName hdr alphabet t tests =
               ]
           , "result:"
           , "if (!chunks[i][0]) { return 0; }" <> "// no value is associated with node"
-          , "cb->consume_result(cc, &results[chunks[i][0]-1], consumed, chunks[i][1] & 1);"
+          , "return (cb->match(cc, &results[chunks[i][0]-1], consumed, chunks[i][1] & 1));"
           ]
      ]
      where
@@ -240,16 +240,16 @@ generateFiles p structName hdr alphabet t tests =
          nest 4 (lbrace <$> vcat
                         [ "int"    <+> parens ("*" <> "has_more_input") <+> parens ("void *") <> ";" 
                         , uint8_t  <+> parens ("*" <> "get_input") <+> parens ("void *") <> ";" 
-                        , "int"    <+> parens ("*" <> "consume_result")
+                        , "void *" <+> parens ("*" <> "match")
                                    <+> tupled [ "void *"
                                               , ctp <+> "*"
                                               , "int"
                                               , "int" ] <> ";" 
                        ]) <$> rbrace <+> radixTrieClb <> "_t" <> ";" 
-     , "int" <+> radixTrie
-             <> (tupled [ "void"   <+> "*cc"
-                        , radixTrieClb <> "_t" <+> "*callback"
-                        ]) <> semi
+     , "void *" <+> radixTrie
+                <> (tupled [ "void"   <+> "*cc"
+                           , radixTrieClb <> "_t" <+> "*callback"
+                           ]) <> semi
      , "#endif"
      ]
 
@@ -280,23 +280,23 @@ generateFiles p structName hdr alphabet t tests =
        , ctp   <+> "should_value[TESTS_SIZE]" <+> "="
                <+> encloseSep' lbrace rbrace ", " shouldValue <> semi
 
-       , "static" <+> ctp <+> "*" <+> "current_value"   <+> "=" <+> "NULL" <> semi
+       , "static" <+> ctp <+> "*" <+> "current_value"   <+> "=" <+> "0" <> semi
        , "static int current_matched  = 0;"
        , "static int current_consumed = 0;"
        , "static int input_idx        = 0;"
        , "static int input_size       = 0;"
-       , "static int * input          = NULL;"
+       , "static int * input          = 0;"
        , function uint8_t "feed_input" ["void * cc"] $ vcat
            [ "if" <+> parens ("input_idx > input_size") <+> "return 0;"
            , "return input[input_idx++];"
            ]
        , function "int" "has_more" ["void * cc"] $ vcat
            [ "return (input_idx <= input_size);" ]
-       , function "int"   "dump_output" [ "void * cc", ctp <+> "* result", "int consumed", "int exact"] $ vcat
+       , function "void *"   "dump_output" [ "void * cc", ctp <+> "* result", "int consumed", "int exact"] $ vcat
            [ "current_value = result;"
            , "current_matched = exact;"
            , "current_consumed = consumed;"
-           , "return 1;"
+           , "return result;"
            ]
        , function "int" "main" ["int argc", "char *argv[]"] $ vcat
            [ "int i = 0"     <> semi
@@ -306,9 +306,9 @@ generateFiles p structName hdr alphabet t tests =
                [ "input_idx  = 1" <> semi
                , "input_size = inputs[i][0]" <> semi
                , "input      = inputs[i]"    <> semi
-               , "int current_result  =" <+> radixTrie <> "(0, &cb);"
-               , if_ "current_result != result[i]" $ vcat
-                    [ "printf(\"%i: [Error: wrong result %i, should be %i]\\n\",i,current_result,result[i]);"
+               , "void * current_result  =" <+> radixTrie <> "(0, &cb);"
+               , if_ "result[i] == !current_result" $ vcat
+                    [ "printf(\"%i: [Error: wrong result %i, should be %i]\\n\",i,!!current_result,result[i]);"
                     , "continue;"
                     ]
                , if_ "current_result" $ vcat 
