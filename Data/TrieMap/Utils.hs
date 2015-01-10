@@ -4,18 +4,17 @@
 --   Provide utility function to work with the trie that contains,
 --   data that is interesting for us.
 --
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Data.TrieMap.Utils
   ( recode
   , normalize
   , improve
-  , flatten
-  , flattenPack
   , buildTrie
-  , Chunked
   , pack
   , promote
+  , lookupG
   -- Packed value
   , Packed(..)
   , packedValue
@@ -26,9 +25,9 @@ import qualified Data.TrieMap as Trie
 
 import           Control.Applicative
 import           Data.List
+import           Data.Either
 import           Data.Maybe
 import qualified Data.Set as Set
-import           Data.Map ( Map )
 import qualified Data.Map as Map
 import           Data.Word
 
@@ -90,7 +89,6 @@ promote (T v m)  = T (f v closest) m'
     f (Just (Packed l Nothing)) w = Just (Packed l (fmap Left w))
     f _ _ = error "impossible happened"
 
-
 improve :: (Eq b) => T a b -> T a b
 improve (T Nothing m) = T k m'
   where m' = Map.map improve m
@@ -98,35 +96,17 @@ improve (T Nothing m) = T k m'
            | otherwise        = Nothing
 improve (T v m)  = T v m
 
-flatten :: T a b -> [(Int,(Maybe b, Map a Int))]
-flatten = snd . go 0
-  where
-    go i (T v m) = (i', (i,(v,m')):ls)   -- XXX: rewrite improve so exposing internal structure will not be needed.
-      where
-        ((i',ls), m') = Map.mapAccumWithKey f (i+1,[]) m
-        f (j,ks) _ t = let (j', ks') = go j t
-                       in ((j', ks++ks'), j)
-
-type Chunked a = Either (Maybe Int, [a]) (Map a Int)
-
-flattenPack :: Int -> T a b -> [(Int, (Maybe b, Chunked a))]
-flattenPack sz = snd . go 0
-   where
-     go i (T v m) = (i', (i, (v, m')):ls)
-        where
-          ((i',ls), m')
-            | Map.size m == 1 && sz > 3 =
-                let (j, p, z) = go2 i $ head $ Map.toList m
-                in ((j, z), Left p)
-            | otherwise       = fmap Right $ Map.mapAccumWithKey f (i+1,[]) m
-          f (j,ks) _ t  = let (j', ks') = go j t
-                          in ((j', ks++ks'), j)
-     go2 :: Int -> (a, T a b) -> (Int, (Maybe Int, [a]), [(Int, (Maybe b, Chunked a))])
-     go2 i (k, t@(T v m))
-           | Map.size m == 0 = (i, (Nothing, [k]), [])
-           | Map.size m == 1 = let (i', (next,l), z) = go2 i $ head $ Map.toList m
-                               in if length l < sz-2
-                                  then (i', (next,k:l), z)
-                                  else  (i'+1, (Just (i'+1), [k]), (i', (v,  Left (next, l))):z)
-           | otherwise       = let (i', z) = go i t
-	                       in (i'+1, (Just (i'+1), [k]), z)
+lookupG :: forall a b . Ord a => (T a b) -> [a] -> (Maybe b, Bool, Int)
+lookupG z p = go 0 (prm z) p 
+  where go c (T v _) [] 
+            = (fmap (either id id) v, maybe False isRight v, c)
+        go c (T _ m) ((\x -> x `Map.lookup` m -> Just t) :xs)
+            = go (c+1) t xs
+        go c (T v _) _
+            = (fmap (either id id) v, False, c)
+        prm :: T a b -> T a (Either b b)
+        prm (T v@Just{} m) = T (fmap Right v) (Map.map prm m)
+        prm (T Nothing m)  = T (fmap Left closest) m'
+          where
+            m' = Map.map prm m
+            closest = fmap (either id id) $ Map.foldl (\mx (T l _) -> mx <|> l) Nothing m'

@@ -13,6 +13,7 @@ import Control.Monad (forM_)
 import Data.Maybe
 import qualified Data.ByteString as B
 import Text.PrettyPrint.Leijen.Text (displayT, renderPretty)
+import qualified Data.Text.Lazy    as Text
 import qualified Data.Text.Lazy.IO as Text
 import System.Exit
 
@@ -41,14 +42,16 @@ main = runCommand $ \opts args -> do
                  exitFailure
     Right ny -> do
       let y = buildTrie $ map (\(Conf k v) -> (k, v)) ny
-      let tests = fullKeys y
-      let (y', alphabet)  = recode y
-      let (y'', values)   = normalize y'
-      let y'''            = improve y''
-      let r               = flattenPack (length alphabet) y'''
-      let xs = generateFiles (moPrefix opts) (moStructName opts) (moHeader opts) y''' r alphabet values tests
-      forM_ xs $ \(f,p) ->
-         Text.writeFile f (displayT (renderPretty 0.6 80 p))
+          (y', alphabet)  = recode y
+          tests = map (\t -> (t, lookupG y t)) $ fullKeys y
+      let xs = generateFiles (Text.pack $ moPrefix opts)
+                             (Text.pack $ moStructName opts)
+                             (Text.pack $ moHeader opts)
+                             alphabet
+                             (promote $ pack y')
+                             tests-- y''' r alphabet values tests
 
-second :: (b -> c) -> (a,b) ->(a,c)
-second f (a,b) = (a, f b)
+      forM_ xs $ \(f,p) ->
+         Text.writeFile (Text.unpack f)
+                        (displayT (renderPretty 0.6 80 p))
+

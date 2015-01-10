@@ -6,6 +6,8 @@ module Language.C.Generate
     function
   , if_
   , for_
+  , define_
+  , doWhile_
   , block
     -- * types
   , uint8_t
@@ -33,9 +35,15 @@ uint32_t = "uint32_t"
 uint64_t :: Doc
 uint64_t = "uint64_t"
 
+define_ :: Pretty a => Doc -> a -> Doc
+define_ d a = "#define" <+> d <+> pretty a
+
 function :: Doc -> Doc -> [Doc] -> Doc -> Doc
 function tp name params body = tp <+> name <> tupled params <>
    nest 4 (lbrace <$> body) <$> rbrace
+
+doWhile_ :: Doc -> Doc -> Doc
+doWhile_ u body = nest 4 ("do" <+> lbrace <$> body) <$> rbrace <+> "while" <> parens u <> semi
 
 if_ :: Doc -> Doc -> Doc
 if_ cls body = "if" <+> parens cls <>
