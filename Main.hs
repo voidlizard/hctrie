@@ -13,6 +13,7 @@ import Control.Monad (forM_)
 import Data.Maybe
 import qualified Data.ByteString as B
 import Text.PrettyPrint.Leijen.Text (displayT, renderPretty)
+import           Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy    as Text
 import qualified Data.Text.Lazy.IO as Text
 import System.Exit
@@ -24,7 +25,7 @@ data MainOptions = MainOptions
   { moInput  :: String
   , moPrefix :: String
   , moStructName :: String
-  , moHeader :: String
+  , moHeader :: String 
   }
 
 instance Options MainOptions where
@@ -32,7 +33,7 @@ instance Options MainOptions where
     <*> simpleOption "input" "" "input file"
     <*> simpleOption "prefix" "" "prefix in functions and files"
     <*> simpleOption "struct" "" "structure name"
-    <*> simpleOption "header" "" "additional header"
+    <*> simpleOption "headers" "" "additional header, comma separated list"
 
 main = runCommand $ \opts args -> do
   let finput = moInput opts
@@ -46,7 +47,9 @@ main = runCommand $ \opts args -> do
           tests = map (\t -> (t, lookupG y t)) $ fullKeys y
       let xs = generateFiles (Text.pack $ moPrefix opts)
                              (Text.pack $ moStructName opts)
-                             (Text.pack $ moHeader opts)
+                             (filter (not.Text.null) 
+                                        $ Text.split (==',')
+                                        $ Text.pack $ moHeader opts)
                              alphabet
                              (promote $ pack y')
                              tests-- y''' r alphabet values tests

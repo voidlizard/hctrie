@@ -120,7 +120,7 @@ prepareNode sz (Node (_,(t,mi)) d) = Node (encloseSep' lbrace rbrace "," (maybe 
 generateFiles :: (CShow a, Ord a)
               => Text 
               -> Text 
-              -> Text 
+              -> [Text]
               -> [Int] -- alphabet
               -> T Int (Packed Int (Either a a))
               -> [([Int],(Maybe a,Bool,Int))]
@@ -151,12 +151,9 @@ generateFiles p structName hdr alphabet t tests =
            _  | structName == "" -> error "struct option should be provided"
               | otherwise  -> string structName
    -- Pretty
-   includes = vcat
-     [ "#include" <+> "<stdint.h>"
-     , if Text.null hdr
-       then empty
-       else "#include" <+> string hdr
-     ]
+   includes = vcat $
+     ("#include" <+> "<stdint.h>") :
+     (map (("#include" <+>) . string) hdr)
    generateFile = vcat
      [ includes
      , "#include" <+> dquotes (string headerFileName)
