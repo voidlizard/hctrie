@@ -25,6 +25,7 @@ data MainOptions = MainOptions
   { moPrefix :: String
   , moStructName :: String
   , moHeader :: String
+  , moTests  :: Bool
   }
 
 instance Options MainOptions where
@@ -32,6 +33,7 @@ instance Options MainOptions where
     <*> simpleOption "prefix" "" "prefix in functions and files"
     <*> simpleOption "struct" "" "structure name"
     <*> simpleOption "headers" "" "additional header, comma separated list"
+    <*> simpleOption "tests"   False "generate test files"
 
 main = runCommand $ \opts args -> do
   input <- case args of
@@ -49,6 +51,7 @@ main = runCommand $ \opts args -> do
           tests = map (\t -> (t, lookupG y t)) $ fullKeys y
       let xs = generateFiles (Text.pack $ moPrefix opts)
                              (Text.pack $ moStructName opts)
+			     (moTests opts)
                              (filter (not.Text.null)
                                         $ Text.split (==',')
                                         $ Text.pack $ moHeader opts)

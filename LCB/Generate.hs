@@ -120,16 +120,18 @@ prepareNode sz (Node (_,(t,mi)) d) = Node (encloseSep' lbrace rbrace "," (maybe 
 generateFiles :: (CShow a, Ord a, Show a)
               => Text 
               -> Text 
+              -> Bool  -- ^ Generate tests
               -> [Text]
               -> [Int] -- alphabet
               -> T Int (Packed Int (Either a a))
               -> [([Int],(Maybe a,Bool,Int))]
               -> [(Text, Doc)]
-generateFiles p structName hdr alphabet t tests =
+generateFiles p structName genTests hdr alphabet t tests =
     [ (prefixed p "radix.c", generateFile)
     , (headerFileName,       generateHeader)
-    , (prefixed p "radix_tests.c", generateTests)
-    ]
+    ] ++ (if genTests
+          then [(prefixed p "radix_tests.c", generateTests)]
+          else [])
  where
    headerFileName = prefixed p "radix.h"
    radixTrie    = string $ prefixed p "radix_trie_lookup"
