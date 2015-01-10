@@ -153,7 +153,6 @@ generateFiles p structName hdr alphabet t tests =
               | otherwise  -> string structName
    -- Pretty
    includes = vcat $
-     ("#include" <+> "<stdint.h>") :
      (map (("#include" <+>) . string) hdr)
    generateFile = vcat
      [ includes
