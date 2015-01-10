@@ -59,7 +59,10 @@ main = runCommand $ \opts args -> do
                              (pack $ promote y')
                              tests
 
-      forM_ xs $ \(f,p) ->
-         Text.writeFile (Text.unpack f)
-                        (displayT (renderPretty 0.6 80 p))
+      forM_ xs $ \e ->
+         case e of
+	   Left  t -> Text.putStrLn t
+	   Right (f,p) ->
+             Text.writeFile (Text.unpack f)
+                            (displayT (renderPretty 0.6 80 p))
 

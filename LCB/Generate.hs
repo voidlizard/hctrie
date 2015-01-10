@@ -125,8 +125,8 @@ generateFiles :: (CShow a, Ord a, Show a)
               -> [Int] -- alphabet
               -> T Int (Packed Int (Either a a))
               -> [([Int],(Maybe a,Bool,Int))]
-              -> [(Text, Doc)]
-generateFiles p structName genTests hdr alphabet t tests =
+              -> [Either Text (Text, Doc)]
+generateFiles p structName genTests hdr alphabet t tests = map Right $
     [ (prefixed p "radix.c", generateFile)
     , (headerFileName,       generateHeader)
     ] ++ (if genTests
