@@ -41,6 +41,8 @@ main = runCommand $ \opts args -> do
   case eny of
     Left s -> do putStrLn $ "Error reading file: " ++ s
                  exitFailure
+    Right [] -> do putStrLn "Error parsing file, no data read"
+                   exitFailure
     Right ny -> do
       let y = buildTrie $ map (\(Conf k v) -> (k, v)) ny
           (y', alphabet)  = recode y
