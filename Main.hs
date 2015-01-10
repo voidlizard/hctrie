@@ -1,6 +1,6 @@
 -- | Copyright: (c) 2015, Alexander Vershilov
 --   Author:    Alexander Vershilov <alexander.vershilov@gmail.com>
--- 
+--
 module Main (main) where
 
 import LCB.Generate
@@ -24,7 +24,7 @@ import Language.C.Generate.Parse
 data MainOptions = MainOptions
   { moPrefix :: String
   , moStructName :: String
-  , moHeader :: String 
+  , moHeader :: String
   }
 
 instance Options MainOptions where
@@ -47,12 +47,12 @@ main = runCommand $ \opts args -> do
           tests = map (\t -> (t, lookupG y t)) $ fullKeys y
       let xs = generateFiles (Text.pack $ moPrefix opts)
                              (Text.pack $ moStructName opts)
-                             (filter (not.Text.null) 
+                             (filter (not.Text.null)
                                         $ Text.split (==',')
                                         $ Text.pack $ moHeader opts)
                              alphabet
-                             (promote $ pack y')
-                             tests-- y''' r alphabet values tests
+                             (pack $ promote y')
+                             tests
 
       forM_ xs $ \(f,p) ->
          Text.writeFile (Text.unpack f)

@@ -112,12 +112,12 @@ prepareNode sz (Node (_,(t,mi)) d) = Node (encloseSep' lbrace rbrace "," (maybe 
         toNodeType True  NodeSwitch{} = 1
         toNodeType False NodeChunk{}  = 2
         toNodeType True  NodeChunk{}  = 3
-        go (NodeSwitch m) = [maybe (int 0) (\(Node (w,_) _) -> int w) $ i `Map.lookup` m | i  <- [0..sz-1]]
+        go (NodeSwitch m) = [maybe (int 0) (\(Node (w,_) _) -> int w) $ i `Map.lookup` m | i  <- [1..sz]]
         go (NodeChunk l n) = int (length l):map int l ++ [maybe "0" (\(Node (w,_) _) -> int w) n]
         node (NodeSwitch m)  = NodeSwitch $ Map.map (prepareNode sz) m
         node (NodeChunk l m) = NodeChunk l $ fmap (prepareNode sz) m
 
-generateFiles :: (CShow a, Ord a)
+generateFiles :: (CShow a, Ord a, Show a)
               => Text 
               -> Text 
               -> [Text]
@@ -138,7 +138,8 @@ generateFiles p structName hdr alphabet t tests =
    -- Tree
    nd = convertTrie t
    (values, ndn) = normalizeValues nd
-   ndd           = prepareNode alphabetSize $ numerate ndn
+   ndd           = prepareNode alphabetSize
+		 $ numerate ndn
    chunksList    = toList ndd
 
    -- Values
@@ -169,10 +170,8 @@ generateFiles p structName hdr alphabet t tests =
                       ] $ vcat
           [ chunkType <+> "i = 0;"
           , "int consumed = 0;"
-          , "int may_match = 1;"
           , doWhile_ "1" $ vcat 
-              [ "may_match = 1;"
-              , chunkType <+> "next = 0;"
+              [ chunkType <+> "next = 0;"
               , uint8_t <+> "s =  0;"
               , "switch(chunks[i][1])" <>
                   block (vcat
@@ -187,14 +186,13 @@ generateFiles p structName hdr alphabet t tests =
                     , "case 2:"
                     , "case 3:"
                     , indent 4 $ vcat
-                       [ "may_match = 0;"
-                       , for_ "" "s < chunks[i][2]" "s++" $ vcat 
+                       [ for_ "" "s < chunks[i][2]" "s++" $ vcat 
                            [ next
                            , if_ "c != chunks[i][3+s]" "goto result;"
                            , "++consumed;"
                            ]
-                       , "may_match = 1;"
-                       , "next = chunks[i][3+s];"
+                       , if_ "(s==chunks[i][2])"
+                             "next = chunks[i][3+s];"
                        ]
                     ])
               , "if (next == 0) break;"
@@ -202,7 +200,7 @@ generateFiles p structName hdr alphabet t tests =
               ]
           , "result:"
           , "if (!chunks[i][0]) { return 0; }" <> "// no value is associated with node"
-          , "cb->consume_result(cc, &results[chunks[i][0]-1], consumed, may_match & chunks[i][1] & 1);"
+          , "cb->consume_result(cc, &results[chunks[i][0]-1], consumed, chunks[i][1] & 1);"
           ]
      ]
      where
@@ -226,7 +224,7 @@ generateFiles p structName hdr alphabet t tests =
        nextChunk :: Doc
        nextChunk
          | fullAlphabet = "next = chunks[i][c+2];"
-         | otherwise    = "next = chunks[i][c+2];"
+         | otherwise    = "next = chunks[i][c+1];"
        chunks = "static" <+> chunkType <+> "chunks" <> brackets "CHUNK_NUM" <> brackets "ALPHABET+2" <+> "=" <+>
              enclose lbrace rbrace
                (align (fillCat $ toList ndd)) -- TODO: use nest
@@ -317,19 +315,16 @@ generateFiles p structName hdr alphabet t tests =
                , if_ "current_result" $ vcat 
                    [ if_ "current_matched != should_match[i]" $ vcat
                       [ "printf(\"%i: [Error: wrong matched %i, should be %i]\\n\",i,current_matched,should_match[i]);"
-                      , "continue;"
                       ]
                    , if_ "current_consumed != should_consume[i]" $ vcat
                       [ "printf(\"%i: [Error: wrong consumed %i, should be %i]\\n\",i,current_consumed,should_consume[i]);"
-                      , "continue" <> semi
                       ]
                    , if_ ("memcmp(&should_value[i], current_value, sizeof(" <> ctp <>"))") $ vcat
                       [ "printf(\"%i: [Error: values not match]]\\n\",i);"
-                      , "continue;"
                       ]
                    ]
-               , "printf(\"%i: OK\\n\", i);"
                ]
+           , "printf(\"%i tests was run\\n\",TESTS_SIZE);"
            ]
        ]
        where (inputs, results) = unzip tests
