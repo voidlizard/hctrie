@@ -1,3 +1,4 @@
+
 #include "finger_radix.h"
 #include <stdio.h>
 #include "gperf_lookup.c"
@@ -31,7 +32,7 @@ void *  __match( void *cc
 }
 
 int main(void) {
-	char *s0 = "bc";//"0603010f42430d2c0c2b3a3b2a02";
+	char *s0 = "aabaa";//"0603010f42430d2c0c2b3a3b2a02";
 	struct str_input i0 = { .p = (uint8_t *)s0, .pe = s0+sizeof(s0)};
 	finger_radix_trie_clb_t cb = { __has_more_input
 	                             , __input
@@ -39,7 +40,7 @@ int main(void) {
 	                             };
 	int * r = (int *)finger_radix_trie_lookup(&i0, &cb);
 	printf("%i\n",*r);
-	int p = in_word_set((char *)s0, sizeof(s0));
-	printf("%i\n",p);
+	void * p = __gperf_finger_lookup((char *)s0, sizeof(s0));
+	printf("%p\n",p);
 	return 0;
 }

@@ -1,0 +1,23 @@
+%language=ANSI-C
+%define hash-function-name __gperf_finger_hash
+%define lookup-function-name __gperf_finger_lookup
+%readonly-tables
+%{
+%}
+struct words_kv {
+  const char    *name;
+  uint8_t        value;
+};
+%%
+aabaa,7
+access,5
+added,2
+adobe,2
+aedb,4 
+agakb,7 
+agoi,2 
+zklm,0
+nfgrt,9
+ufk,0
+qwer,0
+ty,0
