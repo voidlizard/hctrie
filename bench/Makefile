@@ -10,10 +10,10 @@ finger_radix.c: input
 	../dist/build/hctrie/hctrie --prefix finger --headers '<stdint.h>' input
 
 gperf_lookup.c: input
-	gperf -D input > gperf_lookup.c
+	gperf -L ANSI-C -GCD input > gperf_lookup.c
 
 clean:
-	-rm bench
-	-rm finger*
-	-rm gperf_lookup.c
-	-rm *.o
+	$(RM) bench
+	$(RM) finger*
+	$(RM) gperf_lookup.c
+	$(RM) *.o
