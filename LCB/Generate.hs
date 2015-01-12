@@ -132,8 +132,8 @@ generateFiles p structName genTests hdr alphabet t tests = (map Right
     , (headerFileName,       generateHeader)
     ]) ++ (if genTests
           then if canGenTests
-               then [Left  "Warning: tests files were not generated, tests interface for 'char *' is not supported"]
-               else [Right (prefixed p "radix_tests.c", generateTests)]
+               then [Right (prefixed p "radix_tests.c", generateTests)]
+               else [Left  "Warning: tests files were not generated, tests interface for 'char *' is not supported"]
           else [])
  where
    headerFileName = prefixed p "radix.h"
