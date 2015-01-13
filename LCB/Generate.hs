@@ -141,7 +141,8 @@ generateFiles p structName genTests hdr alphabet t tests = (map Right
    radixTrieClb = string $ prefixed p "radix_trie_clb"
 
    -- Tree
-   nd = convertTrie t
+   nd = convertTrie
+      $ breakBySize (alphabetSize-1) t
    (values, ndn) = normalizeValues nd
    ndd           = prepareNode alphabetSize
 		 $ numerate ndn

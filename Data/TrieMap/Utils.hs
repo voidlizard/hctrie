@@ -18,6 +18,7 @@ module Data.TrieMap.Utils
   -- Packed value
   , Packed(..)
   , packedValue
+  , breakBySize
   ) where
 
 import           Data.TrieMap (T(..))
@@ -82,6 +83,16 @@ promote (T Nothing m)  = T (fmap Left closest) m'
   where
     m' = Map.map promote m
     closest = fmap (either id id) $ Map.foldl (\mx (T l _) -> mx <|> l) Nothing m'
+
+-- | Break packed chunk so they contain no more then N bytes
+breakBySize :: Int -> T a (Packed a b) -> T a (Packed a b)
+breakBySize i (T Nothing m)       = T Nothing        $ Map.map (breakBySize i) m
+breakBySize i (T (Just (NonPacked b)) m) = T (Just (NonPacked b)) $ Map.map (breakBySize i) m
+breakBySize i (T (Just (Packed l mb)) m)  
+   | length l < i                 = T (Just $ Packed l mb)  $ Map.map (breakBySize i) m
+   | otherwise                    = T (Just $ Packed hs mb) $ Map.singleton t $ breakBySize i
+                                                            $ T (Just $ Packed ts mb) m
+   where (hs,t:ts) = splitAt (i-1) l
 
 improve :: (Eq b) => T a b -> T a b
 improve (T Nothing m) = T k m'
