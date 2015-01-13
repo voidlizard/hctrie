@@ -3,7 +3,7 @@
 --
 module Main (main) where
 
-import LCB.Generate
+import Language.C.Generate.Trie
 import Data.TrieMap
 import Data.TrieMap.Utils
 

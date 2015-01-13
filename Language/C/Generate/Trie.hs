@@ -4,7 +4,7 @@
 --  XXX: Support total alphabet
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TupleSections #-}
-module LCB.Generate
+module Language.C.Generate.Trie
   ( generateFiles
 --  , generateTests
 --  , generateFiles

@@ -15,9 +15,9 @@ cabal-version:       >=1.10
 library
   exposed-modules:     Data.TrieMap
                        Data.TrieMap.Utils
-                       LCB.Generate
                        Language.C.Generate.Types
                        Language.C.Generate.Parse
+                       Language.C.Generate.Trie
                        Language.C.Generate
   default-extensions:  OverloadedStrings
   -- other-modules:       
@@ -39,7 +39,6 @@ library
 
 executable hctrie
   main-is:             Main.hs
-  other-modules:       LCB.Generate
   build-depends:       base >= 4.7 && < 5,
                        hctrie,
                        options >= 1.2,
