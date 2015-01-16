@@ -1,7 +1,8 @@
 name:                hctrie
 version:             0.1.0.0
--- synopsis:            
--- description:         
+synopsis:            prefix trie generation tool
+description:         Library and utility that can be used to generate
+                     C modules for static prefix trie also called Trie.
 license:             AllRightsReserved
 license-file:        LICENSE
 author:              Alexander Vershilov
@@ -25,6 +26,7 @@ library
                        TupleSections
                        DeriveDataTypeable
                        StandaloneDeriving
+                       FlexibleContexts
   build-depends:       base >=4.7 && <4.8,
                        containers >= 0.5,
 

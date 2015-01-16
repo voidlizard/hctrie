@@ -1,28 +1,27 @@
--- | Copyright: (c) 2015, Alexander Vershilov
---   Author:    Alexander Vershilov <alexander.vershilov@gmail.com>
+-- |
+-- Copyright: (c) 2015, Alexander Vershilov
+-- Portability: unportable (ghc extras)
+--
 --
 -- This module provides a generic structure for Trie generation
 -- and a set of utility functions.
 --
--- TODO:
---
---   * allow overloaded lists
---
---   * use smth better then monoid for b, we just need mempty,
---     or rewrite API so monoid will be used in full generality.
---
---   * use Foldable typeclass to express most of the functions:
---       keys, values, depth
+{-# LANGUAGE FlexibleContexts #-}
 module Data.TrieMap
   ( T(..)
+  -- * Construction
   , empty
   , singleton
+  -- * Modification
   , insert
+  -- * Queries
   , keys
   , values
+  -- * Instance like methods
+  -- ** Bifunctor
   , first
   , second
-    -- experimental
+  -- * Utilities
   , depth
   , fullKeys
   ) where
@@ -33,16 +32,20 @@ import qualified Data.Map as Map
 import           Data.Set (Set)
 import qualified Data.Set as Set
 
+import GHC.Exts
+
 -- | Trie like structure.
 data T a b = T (Maybe b) (Map a (T a b)) deriving Show
 
 instance Functor (T a) where fmap = second
 
-insert :: Ord a => [a] -> b -> T a b -> T a b
-insert []     v (T _ b)  = T (Just v) b
-insert (x:xs) v (T a bs) = T a (Map.alter go x bs)
-  where go Nothing  = Just $ insert xs v (T Nothing Map.empty)
-        go (Just t) = Just $ insert xs v t
+insert :: (Ord (Item a), IsList a) => a -> b -> T (Item a) b -> T (Item a) b
+insert l = inner (toList l)
+  where 
+    inner []     v (T _ b)  = T (Just v) b
+    inner (x:xs) v (T a bs) = T a (Map.alter go x bs)
+      where go Nothing  = Just $ insert xs v (T Nothing Map.empty)
+            go (Just t) = Just $ insert xs v t
 
 -- | Create empty Trie
 empty :: T a b
@@ -58,7 +61,6 @@ keys :: Ord a => T a b -> Set a
 keys (T _ m) = foldl'  Set.union
                       (Set.fromList (Map.keys m))
                       (Map.elems $ Map.map keys m)
-
 
 first :: Ord b => (a -> b) -> T a c -> T b c
 first f (T a m) = T a (Map.mapKeys f (Map.map (first f) m))

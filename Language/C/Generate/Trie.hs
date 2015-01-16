@@ -1,7 +1,5 @@
 -- | Copyright: (c) 2015, Alexander Vershilov
---   Author:    Alexander Vershilov <alexander.vershilov@gmail.com>
 --
---  XXX: Support total alphabet
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TupleSections #-}
 module Language.C.Generate.Trie
@@ -44,7 +42,6 @@ alphabetMaxSize = 256
 
 data Node a b
    = Node { nodeValue      :: b
---          , nodeIsTerminal :: Bool
           , nodeData       :: NodeData a b
           }
    deriving (Show)
